@@ -207,6 +207,16 @@
     .board-box { background: var(--surface2); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
     .board-box p { font-size: .82rem; color: var(--muted); margin-bottom: 8px; }
     .board-id-display { font-family: monospace; font-size: 1.1rem; color: var(--accent); letter-spacing: .1em; }
+    .board-list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-radius: 10px; cursor: pointer;
+      background: var(--surface2); border: 1px solid var(--border); margin-bottom: 8px;
+      transition: border-color .15s;
+    }
+    .board-list-item:hover { border-color: var(--accent); }
+    .board-list-item.active-board { border-color: var(--accent); background: rgba(79,142,247,.08); }
+    .board-list-item .board-name { font-size: .95rem; font-weight: 500; }
+    .board-list-item .board-check { color: var(--accent); font-size: 1.1rem; }
 
     .page { display: none; }
     .page.active { display: block; }
@@ -275,17 +285,14 @@
 <!-- BOARD MODAL -->
 <div class="modal-overlay" id="board-modal">
   <div class="modal">
-    <h3>Board Settings</h3>
-    <div class="board-box">
-      <p>Your current board ID — share this with anyone who should see the same lists:</p>
-      <div class="board-id-display" id="modal-board-id"></div>
+    <h3>Switch Board</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Select a board or create a new one:</p>
+    <div id="board-list-items"></div>
+    <div class="input-row" style="margin-top:8px">
+      <input type="text" id="board-switch-input" placeholder="New board name…" maxlength="30" />
+      <button class="btn btn-primary" onclick="createBoard()">Create</button>
     </div>
-    <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">To join a different board, enter its ID below:</p>
-    <div class="input-row">
-      <input type="text" id="board-switch-input" placeholder="Enter board ID…" maxlength="20" style="text-transform:uppercase" />
-      <button class="btn btn-primary" onclick="switchBoard()">Join</button>
-    </div>
-    <button class="btn btn-ghost btn-full" onclick="closeBoardModal()">Cancel</button>
+    <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeBoardModal()">Cancel</button>
   </div>
 </div>
 
@@ -314,28 +321,47 @@ const firebaseConfig = {
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
-// ── BOARD ID (shared URL param or localStorage) ──────────────────────────────
-function getBoardId() {
+// ── BOARD NAME (localStorage + URL param) ────────────────────────────────────
+function getBoardName() {
   const params = new URLSearchParams(location.search);
-  let id = params.get('board') || localStorage.getItem('boardId');
-  if (!id) { id = randomId(); saveBoardId(id); }
-  return id.toUpperCase();
+  return params.get('board') || localStorage.getItem('boardName') || null;
 }
-function saveBoardId(id) {
-  localStorage.setItem('boardId', id.toUpperCase());
-  history.replaceState({}, '', '?board=' + id.toUpperCase());
+function saveBoardName(name) {
+  localStorage.setItem('boardName', name);
+  history.replaceState({}, '', '?board=' + encodeURIComponent(name));
 }
-function randomId() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+function slugify(name) {
+  return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
-let BOARD = getBoardId();
-document.getElementById('nav-board-id').textContent = BOARD;
-document.getElementById('modal-board-id').textContent = BOARD;
+// Track all known boards in localStorage
+function getKnownBoards() {
+  try { return JSON.parse(localStorage.getItem('knownBoards') || '[]'); } catch { return []; }
+}
+function addKnownBoard(name) {
+  const boards = getKnownBoards();
+  if (!boards.includes(name)) { boards.push(name); localStorage.setItem('knownBoards', JSON.stringify(boards)); }
+}
+
+let BOARD = getBoardName();
+
+// First visit — show board modal immediately
+if (!BOARD) {
+  window.addEventListener('DOMContentLoaded', () => openBoardModal(true));
+  BOARD = '__none__';
+}
+
+if (BOARD && BOARD !== '__none__') {
+  addKnownBoard(BOARD); // auto-save if joined via URL
+  document.getElementById('nav-board-id').textContent = BOARD;
+} else {
+  document.getElementById('nav-board-id').textContent = 'Pick board';
+}
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
-function colRef(...segs) { return collection(db, 'boards', BOARD, ...segs); }
-function docRef(...segs) { return doc(db, 'boards', BOARD, ...segs); }
+function boardSlug() { return slugify(BOARD); }
+function colRef(...segs) { return collection(db, 'boards', boardSlug(), ...segs); }
+function docRef(...segs) { return doc(db, 'boards', boardSlug(), ...segs); }
 
 function showToast(msg, dur = 2200) {
   const t = document.getElementById('toast');
@@ -658,18 +684,35 @@ function renderArchive(archives) {
 }
 
 // ── BOARD MODAL ───────────────────────────────────────────────────────────────
-window.openBoardModal = function() {
-  document.getElementById('modal-board-id').textContent = BOARD;
+window.openBoardModal = function(required = false) {
+  const boards = getKnownBoards();
+  const listEl = document.getElementById('board-list-items');
+  listEl.innerHTML = '';
+  boards.forEach(name => {
+    const div = document.createElement('div');
+    div.className = 'board-list-item' + (name === BOARD ? ' active-board' : '');
+    div.innerHTML = `<span class="board-name">${esc(name)}</span>${name === BOARD ? '<span class="board-check">✓</span>' : ''}`;
+    div.onclick = () => { if (name !== BOARD) { saveBoardName(name); location.reload(); } else { closeBoardModal(); } };
+    listEl.appendChild(div);
+  });
   document.getElementById('board-switch-input').value = '';
-  document.getElementById('board-modal').classList.add('open');
+  const modal = document.getElementById('board-modal');
+  modal.classList.add('open');
+  if (required) {
+    // hide cancel button on first visit
+    modal.querySelector('.btn-ghost').style.display = 'none';
+  } else {
+    modal.querySelector('.btn-ghost').style.display = '';
+  }
 };
 window.closeBoardModal = function() {
   document.getElementById('board-modal').classList.remove('open');
 };
-window.switchBoard = function() {
-  const inp = document.getElementById('board-switch-input').value.trim().toUpperCase();
-  if (!inp || inp.length < 4) { showToast('Enter a valid board ID'); return; }
-  saveBoardId(inp);
+window.createBoard = function() {
+  const inp = document.getElementById('board-switch-input').value.trim();
+  if (!inp || inp.length < 2) { showToast('Enter a board name (2+ characters)'); return; }
+  addKnownBoard(inp);
+  saveBoardName(inp);
   location.reload();
 };
 
