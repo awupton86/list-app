@@ -692,9 +692,12 @@ window.openBoardModal = async function(required = false) {
   modal.classList.add('open');
   modal.querySelector('.btn-ghost').style.display = required ? 'none' : '';
 
-  // Load all boards from Firestore
-  const snap = await getDocs(query(collection(db, 'boardDirectory'), orderBy('name')));
-  const firestoreBoards = snap.docs.map(d => d.data().name);
+  // Load all boards from Firestore (no orderBy to avoid index requirement)
+  let firestoreBoards = [];
+  try {
+    const snap = await getDocs(collection(db, 'boardDirectory'));
+    firestoreBoards = snap.docs.map(d => d.data().name).filter(Boolean);
+  } catch(e) { console.warn('boardDirectory load failed', e); }
 
   // Merge with locally known boards
   const local = getKnownBoards();
@@ -707,7 +710,12 @@ window.openBoardModal = async function(required = false) {
   all.forEach(name => {
     const div = document.createElement('div');
     div.className = 'board-list-item' + (name === BOARD ? ' active-board' : '');
-    div.innerHTML = `<span class="board-name">${esc(name)}</span>${name === BOARD ? '<span class="board-check">✓</span>' : ''}`;
+    div.innerHTML = `
+      <span class="board-name">${esc(name)}</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${name === BOARD ? '<span class="board-check">✓</span>' : ''}
+        <span style="color:var(--red);font-size:.8rem;cursor:pointer;padding:2px 6px" onclick="deleteBoard(event,'${esc(name)}')">✕</span>
+      </div>`;
     div.onclick = () => {
       if (name !== BOARD) { addKnownBoard(name); saveBoardName(name); location.reload(); }
       else { closeBoardModal(); }
@@ -717,6 +725,18 @@ window.openBoardModal = async function(required = false) {
 };
 window.closeBoardModal = function() {
   document.getElementById('board-modal').classList.remove('open');
+};
+window.deleteBoard = async function(e, name) {
+  e.stopPropagation();
+  if (!confirm(`Delete board "${name}"? This won't delete its data, just remove it from the list.`)) return;
+  // Remove from Firestore directory
+  await deleteDoc(doc(db, 'boardDirectory', slugify(name)));
+  // Remove from local list
+  const boards = getKnownBoards().filter(b => b !== name);
+  localStorage.setItem('knownBoards', JSON.stringify(boards));
+  // If deleting current board, clear it
+  if (name === BOARD) { localStorage.removeItem('boardName'); history.replaceState({}, '', location.pathname); }
+  openBoardModal(name === BOARD);
 };
 window.createBoard = async function() {
   const inp = document.getElementById('board-switch-input').value.trim();
