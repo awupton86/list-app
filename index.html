@@ -450,42 +450,73 @@ window.deleteMasterItem = async function(id) {
 
 window.buildRun = async function() {
   if (selectedForRun.size === 0) return;
-  // check no active run exists
-  const runSnap = await getDoc(docRef('activeRun', 'current'));
-  if (runSnap.exists()) {
-    showToast('Complete the current run first!');
-    switchTab('run');
-    return;
-  }
-  const items = masterItems
+  const newItems = masterItems
     .filter(i => selectedForRun.has(i.id))
     .map(i => ({ id: i.id, name: i.name, checked: false, note: '' }));
 
-  await setDoc(docRef('activeRun', 'current'), {
-    items,
-    createdAt: serverTimestamp(),
-    note: ''
-  });
-  selectedForRun.clear();
-  renderMaster();
-  switchTab('run');
-  showToast('Run started!');
+  if (activeRuns.length === 0) {
+    // No existing runs — just create one
+    await addDoc(colRef('activeRuns'), { items: newItems, createdAt: serverTimestamp(), note: '', label: '' });
+    selectedForRun.clear();
+    renderMaster();
+    switchTab('run');
+    showToast('Run started!');
+  } else {
+    // Show prompt — add to existing or new
+    pendingNewItems = newItems;
+    openAddToRunModal();
+  }
 };
 
-// ════════════════════════════════════════════════════════════════════════════
-// ACTIVE RUN
-// ════════════════════════════════════════════════════════════════════════════
-let activeRun = null;
-let openNotes = new Set();
+let pendingNewItems = [];
 
-onSnapshot(docRef('activeRun', 'current'), snap => {
-  activeRun = snap.exists() ? snap.data() : null;
+function openAddToRunModal() {
+  const modal = document.getElementById('complete-modal');
+  const msg = document.getElementById('complete-modal-msg');
+  const btns = document.getElementById('complete-modal-btns');
+  msg.textContent = 'You have active runs. What would you like to do?';
+  btns.innerHTML = '';
+
+  activeRuns.forEach((run, idx) => {
+    const label = run.label || `Run ${idx + 1} (${run.items.length} items)`;
+    addModalBtn(btns, `Add to: ${label}`, 'btn-primary', async () => {
+      closeCMod();
+      const merged = [...run.items, ...pendingNewItems.filter(ni => !run.items.find(ri => ri.id === ni.id))];
+      await updateDoc(docRef('activeRuns', run.docId), { items: merged });
+      pendingNewItems = [];
+      selectedForRun.clear();
+      renderMaster();
+      switchTab('run');
+      showToast('Items added to run!');
+    });
+  });
+
+  addModalBtn(btns, 'Start a new run', 'btn-ghost', async () => {
+    closeCMod();
+    await addDoc(colRef('activeRuns'), { items: pendingNewItems, createdAt: serverTimestamp(), note: '', label: '' });
+    pendingNewItems = [];
+    selectedForRun.clear();
+    renderMaster();
+    switchTab('run');
+    showToast('New run started!');
+  });
+  addModalBtn(btns, 'Cancel', 'btn-ghost', closeCMod);
+  modal.classList.add('open');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACTIVE RUNS (multiple)
+// ════════════════════════════════════════════════════════════════════════════
+let activeRuns = [];
+let openNotes = {}; // { docId: Set of indices }
+
+onSnapshot(query(colRef('activeRuns'), orderBy('createdAt')), snap => {
+  activeRuns = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
   renderRun();
-  // pill
   const pill = document.getElementById('run-pill');
-  if (activeRun) {
-    const unchecked = activeRun.items.filter(i => !i.checked).length;
-    pill.textContent = unchecked;
+  const totalUnchecked = activeRuns.reduce((sum, r) => sum + r.items.filter(i => !i.checked).length, 0);
+  if (activeRuns.length > 0) {
+    pill.textContent = totalUnchecked;
     pill.style.display = 'inline-block';
   } else {
     pill.style.display = 'none';
@@ -494,94 +525,124 @@ onSnapshot(docRef('activeRun', 'current'), snap => {
 
 function renderRun() {
   const el = document.getElementById('run-content');
-  if (!activeRun) {
-    el.innerHTML = `<div class="empty">No active run.<br>Go to <strong>Items</strong>, select what you need, then tap <strong>Start Run</strong>.</div>`;
+  if (activeRuns.length === 0) {
+    el.innerHTML = `<div class="empty">No active runs.<br>Go to <strong>Items</strong>, select what you need, then tap <strong>Start Run</strong>.</div>`;
     return;
   }
-
-  const items = activeRun.items;
-  const done = items.filter(i => i.checked).length;
-
   el.innerHTML = '';
+  activeRuns.forEach((run, runIdx) => renderRunCard(el, run, runIdx));
+}
 
-  // progress bar
+function renderRunCard(container, run, runIdx) {
+  const items = run.items;
+  const done = items.filter(i => i.checked).length;
   const pct = items.length ? Math.round(done / items.length * 100) : 0;
-  const prog = document.createElement('div');
-  prog.style.cssText = 'margin-bottom:16px';
-  prog.innerHTML = `
-    <div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--muted);margin-bottom:6px">
-      <span>${done} / ${items.length} done</span><span>${pct}%</span>
-    </div>
-    <div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden">
-      <div style="height:100%;width:${pct}%;background:var(--green);border-radius:4px;transition:width .3s"></div>
-    </div>`;
-  el.appendChild(prog);
+  const notes = openNotes[run.docId] || new Set();
 
+  const wrap = document.createElement('div');
+  wrap.style.marginBottom = '24px';
+
+  // Header with label
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px';
+  header.innerHTML = `
+    <div style="font-size:.82rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">
+      Run ${runIdx + 1}${run.label ? ' — ' + esc(run.label) : ''}
+    </div>
+    <div style="font-size:.78rem;color:var(--muted)">${done}/${items.length} · ${pct}%</div>`;
+  wrap.appendChild(header);
+
+  // Progress bar
+  const bar = document.createElement('div');
+  bar.style.cssText = 'height:6px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:12px';
+  bar.innerHTML = `<div style="height:100%;width:${pct}%;background:var(--green);border-radius:4px;transition:width .3s"></div>`;
+  wrap.appendChild(bar);
+
+  // Items card
   const card = document.createElement('div');
   card.className = 'card';
-
   items.forEach((item, idx) => {
     const row = document.createElement('div');
     row.className = 'item-row';
     row.style.flexWrap = 'wrap';
-
-    const noteOpen = openNotes.has(idx);
+    const noteOpen = notes.has(idx);
     row.innerHTML = `
-      <div class="cb ${item.checked ? 'checked' : ''}" onclick="toggleCheck(${idx})"></div>
+      <div class="cb ${item.checked ? 'checked' : ''}" onclick="toggleCheck('${run.docId}',${idx})"></div>
       <span class="item-name ${item.checked ? 'strike' : ''}">${esc(item.name)}</span>
-      <span class="notes-toggle" onclick="toggleNote(${idx})">${item.note ? '📝' : '+ note'}</span>
+      <span class="notes-toggle" onclick="toggleNote('${run.docId}',${idx})">${item.note ? '📝' : '+ note'}</span>
       <div class="notes-area ${noteOpen ? 'open' : ''}" style="width:100%;padding-left:32px">
-        <textarea placeholder="Add a note…" onchange="saveNote(${idx}, this.value)">${esc(item.note || '')}</textarea>
-      </div>
-    `;
+        <textarea placeholder="Add a note…" onchange="saveNote('${run.docId}',${idx},this.value)">${esc(item.note || '')}</textarea>
+      </div>`;
     card.appendChild(row);
   });
-
-  el.appendChild(card);
+  wrap.appendChild(card);
 
   // Run note
-  const runNoteWrap = document.createElement('div');
-  runNoteWrap.style.marginTop = '12px';
-  runNoteWrap.innerHTML = `
+  const noteWrap = document.createElement('div');
+  noteWrap.style.marginTop = '10px';
+  noteWrap.innerHTML = `
     <p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Run notes</p>
-    <textarea placeholder="Notes for this run…" onchange="saveRunNote(this.value)">${esc(activeRun.note || '')}</textarea>
-  `;
-  el.appendChild(runNoteWrap);
+    <textarea placeholder="Notes for this run…" onchange="saveRunNote('${run.docId}',this.value)">${esc(run.note || '')}</textarea>`;
+  wrap.appendChild(noteWrap);
 
-  // Complete button
-  const btn = document.createElement('button');
-  btn.className = 'btn btn-success btn-full';
-  btn.textContent = '✓ Complete Run';
-  btn.onclick = initiateComplete;
-  el.appendChild(btn);
+  // Buttons row
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;margin-top:10px';
+
+  const completeBtn = document.createElement('button');
+  completeBtn.className = 'btn btn-success';
+  completeBtn.style.flex = '1';
+  completeBtn.textContent = '✓ Complete';
+  completeBtn.onclick = () => initiateComplete(run);
+  btnRow.appendChild(completeBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-danger';
+  cancelBtn.style.flex = '1';
+  cancelBtn.textContent = '✕ Cancel Run';
+  cancelBtn.onclick = () => initiateCancel(run);
+  btnRow.appendChild(cancelBtn);
+
+  wrap.appendChild(btnRow);
+
+  // Divider between runs
+  if (activeRuns.length > 1) {
+    wrap.style.borderBottom = '1px solid var(--border)';
+    wrap.style.paddingBottom = '24px';
+  }
+
+  container.appendChild(wrap);
 }
 
-window.toggleCheck = async function(idx) {
-  if (!activeRun) return;
-  const items = [...activeRun.items];
+window.toggleCheck = async function(docId, idx) {
+  const run = activeRuns.find(r => r.docId === docId);
+  if (!run) return;
+  const items = [...run.items];
   items[idx] = { ...items[idx], checked: !items[idx].checked };
-  await updateDoc(docRef('activeRun', 'current'), { items });
+  await updateDoc(docRef('activeRuns', docId), { items });
 };
 
-window.toggleNote = function(idx) {
-  openNotes.has(idx) ? openNotes.delete(idx) : openNotes.add(idx);
+window.toggleNote = function(docId, idx) {
+  if (!openNotes[docId]) openNotes[docId] = new Set();
+  openNotes[docId].has(idx) ? openNotes[docId].delete(idx) : openNotes[docId].add(idx);
   renderRun();
 };
 
-window.saveNote = async function(idx, val) {
-  if (!activeRun) return;
-  const items = [...activeRun.items];
+window.saveNote = async function(docId, idx, val) {
+  const run = activeRuns.find(r => r.docId === docId);
+  if (!run) return;
+  const items = [...run.items];
   items[idx] = { ...items[idx], note: val };
-  await updateDoc(docRef('activeRun', 'current'), { items });
+  await updateDoc(docRef('activeRuns', docId), { items });
 };
 
-window.saveRunNote = async function(val) {
-  await updateDoc(docRef('activeRun', 'current'), { note: val });
+window.saveRunNote = async function(docId, val) {
+  await updateDoc(docRef('activeRuns', docId), { note: val });
 };
 
-// ── COMPLETE FLOW ─────────────────────────────────────────────────────────────
-function initiateComplete() {
-  const unchecked = activeRun.items.filter(i => !i.checked);
+// ── COMPLETE & CANCEL FLOW ────────────────────────────────────────────────────
+function initiateComplete(run) {
+  const unchecked = run.items.filter(i => !i.checked);
   const modal = document.getElementById('complete-modal');
   const msg = document.getElementById('complete-modal-msg');
   const btns = document.getElementById('complete-modal-btns');
@@ -589,14 +650,28 @@ function initiateComplete() {
 
   if (unchecked.length === 0) {
     msg.textContent = 'All items checked! Archive this run?';
-    addModalBtn(btns, 'Archive & Finish', 'btn-success', () => completeRun('archive-all'));
-    addModalBtn(btns, 'Cancel', 'btn-ghost', closeCMod);
+    addModalBtn(btns, 'Archive & Finish', 'btn-success', () => completeRun(run, 'archive-all'));
+    addModalBtn(btns, 'Dismiss', 'btn-ghost', closeCMod);
   } else {
     msg.textContent = `${unchecked.length} item${unchecked.length > 1 ? 's' : ''} still unchecked. What would you like to do?`;
-    addModalBtn(btns, 'Keep unchecked → new run', 'btn-primary', () => completeRun('split'));
-    addModalBtn(btns, 'Archive everything as-is', 'btn-ghost', () => completeRun('archive-all'));
-    addModalBtn(btns, 'Cancel', 'btn-ghost', closeCMod);
+    addModalBtn(btns, 'Keep unchecked → new run', 'btn-primary', () => completeRun(run, 'split'));
+    addModalBtn(btns, 'Archive everything as-is', 'btn-ghost', () => completeRun(run, 'archive-all'));
+    addModalBtn(btns, 'Dismiss', 'btn-ghost', closeCMod);
   }
+  modal.classList.add('open');
+}
+
+function initiateCancel(run) {
+  const modal = document.getElementById('complete-modal');
+  const msg = document.getElementById('complete-modal-msg');
+  const btns = document.getElementById('complete-modal-btns');
+  msg.innerHTML = `Cancel this run? It will be archived with a cancellation note.<br><br>
+    <textarea id="cancel-reason" placeholder="Reason for cancelling (optional)…"
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+             border-radius:10px;padding:10px;font-family:inherit;font-size:.88rem;resize:vertical;min-height:70px"></textarea>`;
+  btns.innerHTML = '';
+  addModalBtn(btns, 'Cancel Run & Archive', 'btn-danger', () => cancelRun(run));
+  addModalBtn(btns, 'Dismiss', 'btn-ghost', closeCMod);
   modal.classList.add('open');
 }
 
@@ -610,33 +685,48 @@ function addModalBtn(container, label, cls, fn) {
 
 function closeCMod() { document.getElementById('complete-modal').classList.remove('open'); }
 
-async function completeRun(mode) {
+async function completeRun(run, mode) {
   closeCMod();
-  const run = activeRun;
   const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) +
+    ' ' + now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
 
-  // Save archive
   await addDoc(colRef('archive'), {
     items: run.items,
     note: run.note || '',
+    status: 'completed',
     completedAt: serverTimestamp(),
-    completedAtStr: now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) +
-      ' ' + now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })
+    completedAtStr: dateStr
   });
 
   if (mode === 'split') {
     const unchecked = run.items.filter(i => !i.checked).map(i => ({ ...i, checked: false, note: '' }));
-    await setDoc(docRef('activeRun', 'current'), {
-      items: unchecked,
-      createdAt: serverTimestamp(),
-      note: ''
-    });
+    await addDoc(colRef('activeRuns'), { items: unchecked, createdAt: serverTimestamp(), note: '', label: '' });
     showToast('Archived! New run started with remaining items.');
   } else {
-    await deleteDoc(docRef('activeRun', 'current'));
     showToast('Run completed & archived!');
-    switchTab('archive');
   }
+  await deleteDoc(docRef('activeRuns', run.docId));
+  if (activeRuns.length <= 1) switchTab('archive');
+}
+
+async function cancelRun(run) {
+  const reason = (document.getElementById('cancel-reason')?.value || '').trim();
+  closeCMod();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) +
+    ' ' + now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+
+  await addDoc(colRef('archive'), {
+    items: run.items,
+    note: run.note || '',
+    cancelReason: reason,
+    status: 'cancelled',
+    completedAt: serverTimestamp(),
+    completedAtStr: dateStr
+  });
+  await deleteDoc(docRef('activeRuns', run.docId));
+  showToast('Run cancelled & archived.');
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -656,14 +746,16 @@ function renderArchive(archives) {
   el.innerHTML = '';
   archives.forEach(arc => {
     const done = arc.items.filter(i => i.checked).length;
+    const cancelled = arc.status === 'cancelled';
     const div = document.createElement('div');
     div.className = 'archive-card';
     div.innerHTML = `
       <div class="arc-header">
-        <span class="arc-name">Run — ${arc.completedAtStr || '—'}</span>
-        <span class="badge green">${done}/${arc.items.length}</span>
+        <span class="arc-name">${cancelled ? '✕ Cancelled' : '✓ Completed'} — ${arc.completedAtStr || '—'}</span>
+        <span class="badge ${cancelled ? '' : 'green'}">${done}/${arc.items.length}</span>
       </div>
       <div class="arc-items">${arc.items.slice(0,4).map(i => i.name).join(', ')}${arc.items.length > 4 ? '…' : ''}</div>
+      ${cancelled && arc.cancelReason ? `<div style="font-size:.78rem;color:var(--red);margin-top:4px">Reason: ${esc(arc.cancelReason)}</div>` : ''}
       ${arc.note ? `<div style="font-size:.78rem;color:var(--muted);margin-top:4px">📝 ${esc(arc.note)}</div>` : ''}
       <div class="archive-detail" id="arc-detail-${arc.id}">
         ${arc.items.map(i => `
@@ -673,6 +765,7 @@ function renderArchive(archives) {
             ${i.note ? `<span style="font-size:.75rem;color:var(--muted)">— ${esc(i.note)}</span>` : ''}
           </div>`).join('')}
         ${arc.note ? `<div style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:8px;font-size:.82rem;color:var(--muted)">📝 ${esc(arc.note)}</div>` : ''}
+        ${cancelled && arc.cancelReason ? `<div style="margin-top:8px;padding:8px;background:rgba(247,90,90,.1);border-radius:8px;font-size:.82rem;color:var(--red)">Cancelled: ${esc(arc.cancelReason)}</div>` : ''}
       </div>
     `;
     div.onclick = () => {
