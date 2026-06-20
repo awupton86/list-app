@@ -304,7 +304,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
-  onSnapshot, query, orderBy, serverTimestamp, getDoc
+  onSnapshot, query, orderBy, serverTimestamp, getDoc, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ─── PASTE YOUR FIREBASE CONFIG HERE ────────────────────────────────────────
@@ -684,33 +684,45 @@ function renderArchive(archives) {
 }
 
 // ── BOARD MODAL ───────────────────────────────────────────────────────────────
-window.openBoardModal = function(required = false) {
-  const boards = getKnownBoards();
+window.openBoardModal = async function(required = false) {
   const listEl = document.getElementById('board-list-items');
-  listEl.innerHTML = '';
-  boards.forEach(name => {
-    const div = document.createElement('div');
-    div.className = 'board-list-item' + (name === BOARD ? ' active-board' : '');
-    div.innerHTML = `<span class="board-name">${esc(name)}</span>${name === BOARD ? '<span class="board-check">✓</span>' : ''}`;
-    div.onclick = () => { if (name !== BOARD) { saveBoardName(name); location.reload(); } else { closeBoardModal(); } };
-    listEl.appendChild(div);
-  });
+  listEl.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:8px 0">Loading boards…</div>';
   document.getElementById('board-switch-input').value = '';
   const modal = document.getElementById('board-modal');
   modal.classList.add('open');
-  if (required) {
-    // hide cancel button on first visit
-    modal.querySelector('.btn-ghost').style.display = 'none';
-  } else {
-    modal.querySelector('.btn-ghost').style.display = '';
+  modal.querySelector('.btn-ghost').style.display = required ? 'none' : '';
+
+  // Load all boards from Firestore
+  const snap = await getDocs(query(collection(db, 'boardDirectory'), orderBy('name')));
+  const firestoreBoards = snap.docs.map(d => d.data().name);
+
+  // Merge with locally known boards
+  const local = getKnownBoards();
+  const all = [...new Set([...firestoreBoards, ...local])].sort((a,b) => a.localeCompare(b));
+
+  listEl.innerHTML = '';
+  if (all.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:8px 0">No boards yet — create one below.</div>';
   }
+  all.forEach(name => {
+    const div = document.createElement('div');
+    div.className = 'board-list-item' + (name === BOARD ? ' active-board' : '');
+    div.innerHTML = `<span class="board-name">${esc(name)}</span>${name === BOARD ? '<span class="board-check">✓</span>' : ''}`;
+    div.onclick = () => {
+      if (name !== BOARD) { addKnownBoard(name); saveBoardName(name); location.reload(); }
+      else { closeBoardModal(); }
+    };
+    listEl.appendChild(div);
+  });
 };
 window.closeBoardModal = function() {
   document.getElementById('board-modal').classList.remove('open');
 };
-window.createBoard = function() {
+window.createBoard = async function() {
   const inp = document.getElementById('board-switch-input').value.trim();
   if (!inp || inp.length < 2) { showToast('Enter a board name (2+ characters)'); return; }
+  // Register board in Firestore so all users see it
+  await setDoc(doc(db, 'boardDirectory', slugify(inp)), { name: inp, createdAt: serverTimestamp() });
   addKnownBoard(inp);
   saveBoardName(inp);
   location.reload();
