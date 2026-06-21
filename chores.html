@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Chores — Upton ∞ +1</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424;
+      --border: #2e2e2e; --text: #e8e8e8; --muted: #888;
+      --accent: #4f8ef7; --accent2: #3a7de0; --green: #3ecf6a;
+      --red: #f75a5a; --yellow: #f7c94f; --radius: 12px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100dvh; display: flex; flex-direction: column; }
+
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; align-items: center; gap: 8px; height: 56px; position: sticky; top: 0; z-index: 100; }
+    .nav-logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -.5px; color: var(--accent); flex: 1; display: flex; align-items: center; gap: 6px; }
+    .nav-logo .sep { color: #444; }
+    .nav-logo .brand { font-weight: 700; letter-spacing: .08em; color: var(--text); font-size: 1rem; }
+    .nav-logo .inf { font-size: 1.4rem; line-height: 1; color: var(--accent); font-weight: 700; }
+    .nav-logo .plus { color: var(--muted); font-weight: 400; }
+    .nav-logo .one { font-weight: 700; color: var(--text); }
+    .back-link { font-size: .8rem; color: var(--accent); text-decoration: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; white-space: nowrap; }
+
+    .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .tab { flex: 1; text-align: center; padding: 12px 4px; font-size: .82rem; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    main { flex: 1; overflow-y: auto; padding: 16px; max-width: 640px; width: 100%; margin: 0 auto; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; margin-top: 20px; }
+    .section-header:first-child { margin-top: 0; }
+    .section-header h2 { font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px; }
+
+    .cb { width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--border); background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s, border-color .15s; }
+    .cb.checked { background: var(--green); border-color: var(--green); }
+    .cb.checked::after { content: '✓'; color: #000; font-size: .85rem; font-weight: 700; }
+
+    .chore-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .chore-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .chore-row:first-child { padding-top: 0; }
+    .chore-name { flex: 1; font-size: .92rem; }
+    .chore-name.done { text-decoration: line-through; color: var(--muted); }
+
+    .avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; flex-shrink: 0; color: #000; }
+    .avatar-sm { width: 22px; height: 22px; font-size: .6rem; }
+
+    .person-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .person-header .person-name { font-size: .9rem; font-weight: 600; }
+    .all-done { font-size: .8rem; color: var(--green); }
+
+    .day-section { margin-bottom: 20px; }
+    .day-label { font-size: .82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .day-label.today-label { color: var(--accent); }
+    .day-badge { font-size: .68rem; background: var(--accent); color: #fff; border-radius: 10px; padding: 1px 7px; font-weight: 700; }
+
+    .week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .week-range { font-size: .88rem; color: var(--muted); }
+    .week-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: .85rem; }
+    .week-btn:hover { border-color: var(--accent); }
+
+    .assignee-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+    .assignee-chip { font-size: .72rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+
+    .recur-badge { font-size: .7rem; color: var(--muted); background: var(--surface2); border-radius: 8px; padding: 2px 7px; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 18px; border-radius: var(--radius); font-size: .88rem; font-weight: 600; cursor: pointer; border: none; transition: opacity .15s, transform .1s; }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: .78rem; }
+    .btn-full { width: 100%; margin-top: 10px; }
+
+    .input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    input[type=text], input[type=date], select, textarea {
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      border-radius: var(--radius); padding: 10px 14px; font-size: .9rem; font-family: inherit; outline: none; transition: border-color .15s;
+    }
+    input[type=text] { flex: 1; }
+    input[type=date] { flex: 1; color-scheme: dark; }
+    input[type=text]:focus, input[type=date]:focus { border-color: var(--accent); }
+
+    .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip { padding: 6px 14px; border-radius: 20px; border: 2px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: .82rem; font-weight: 600; transition: all .15s; }
+    .chip.selected { border-color: var(--accent); color: var(--text); background: rgba(79,142,247,.15); }
+    .chip.person-chip.selected { color: #000; border-color: transparent; }
+
+    .recur-options { display: flex; gap: 8px; margin-bottom: 12px; }
+    .recur-opt { flex: 1; padding: 10px; text-align: center; border-radius: 10px; border: 2px solid var(--border); cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--muted); transition: all .15s; }
+    .recur-opt.selected { border-color: var(--accent); color: var(--text); background: rgba(79,142,247,.1); }
+
+    .form-label { font-size: .78rem; color: var(--muted); margin-bottom: 6px; display: block; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: flex; align-items: flex-end; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity .2s; }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal { background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; padding: 24px 20px 32px; width: 100%; max-width: 640px; transform: translateY(40px); transition: transform .25s; max-height: 90vh; overflow-y: auto; }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal h3 { font-size: 1.05rem; margin-bottom: 16px; }
+
+    .manage-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .manage-row:last-child { border-bottom: none; }
+    .manage-row .row-name { flex: 1; font-size: .92rem; }
+    .manage-row .row-meta { font-size: .75rem; color: var(--muted); }
+    .del-btn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 4px 8px; border-radius: 6px; }
+    .del-btn:hover { color: var(--red); background: rgba(247,90,90,.1); }
+
+    .empty { text-align: center; color: var(--muted); padding: 40px 16px; font-size: .9rem; line-height: 1.6; }
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 30px; font-size: .85rem; font-weight: 500; z-index: 300; transition: transform .3s; white-space: nowrap; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .loader { text-align: center; padding: 48px; color: var(--muted); }
+
+    .today-date { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+    .no-chores-today { text-align: center; color: var(--muted); padding: 32px; font-size: .88rem; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-logo">
+    <span>Chores</span>
+    <span class="sep">·</span>
+    <span class="brand">UPTON</span>
+    <span class="inf">∞</span>
+    <span class="plus">+</span>
+    <span class="one">1</span>
+  </span>
+  <a href="index.html" class="back-link">← Lists</a>
+</nav>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('today')" id="tab-today">Today</div>
+  <div class="tab" onclick="switchTab('week')" id="tab-week">Week</div>
+  <div class="tab" onclick="switchTab('manage')" id="tab-manage">Manage</div>
+</div>
+
+<main>
+  <div class="page active" id="page-today">
+    <div id="today-content"><div class="loader">Loading…</div></div>
+  </div>
+
+  <div class="page" id="page-week">
+    <div class="week-nav">
+      <button class="week-btn" onclick="changeWeek(-1)">← Prev</button>
+      <span class="week-range" id="week-range-label"></span>
+      <button class="week-btn" onclick="changeWeek(1)">Next →</button>
+    </div>
+    <div id="week-content"><div class="loader">Loading…</div></div>
+  </div>
+
+  <div class="page" id="page-manage">
+    <div class="section-header">
+      <h2>People</h2>
+    </div>
+    <div class="card" id="people-list"><div class="loader">Loading…</div></div>
+    <div class="input-row" style="margin-top:10px">
+      <input type="text" id="new-person-input" placeholder="Add person…" maxlength="30" onkeydown="if(event.key==='Enter') addPerson()" />
+      <button class="btn btn-primary" onclick="addPerson()">Add</button>
+    </div>
+
+    <div class="section-header">
+      <h2>Chores</h2>
+      <button class="btn btn-primary btn-sm" onclick="openChoreModal()">+ Add Chore</button>
+    </div>
+    <div id="chores-manage-list"><div class="loader">Loading…</div></div>
+  </div>
+</main>
+
+<!-- ADD CHORE MODAL -->
+<div class="modal-overlay" id="chore-modal">
+  <div class="modal">
+    <h3 id="chore-modal-title">Add Chore</h3>
+    <label class="form-label">Chore name</label>
+    <div class="input-row">
+      <input type="text" id="chore-name-input" placeholder="e.g. Dishes, Vacuum, Take out trash…" maxlength="60" />
+    </div>
+    <label class="form-label">Assign to</label>
+    <div class="chip-group" id="assignee-chips"></div>
+    <label class="form-label">Recurrence</label>
+    <div class="recur-options">
+      <div class="recur-opt selected" id="recur-daily" onclick="setRecur('daily')">Daily</div>
+      <div class="recur-opt" id="recur-weekly" onclick="setRecur('weekly')">Weekly</div>
+      <div class="recur-opt" id="recur-once" onclick="setRecur('once')">One-time</div>
+    </div>
+    <div id="weekly-day-picker" style="display:none;margin-bottom:12px">
+      <label class="form-label">Which days?</label>
+      <div class="chip-group" id="day-chips"></div>
+    </div>
+    <div id="once-date-picker" style="display:none;margin-bottom:12px">
+      <label class="form-label">Date</label>
+      <input type="date" id="once-date-input" style="width:100%" />
+    </div>
+    <button class="btn btn-primary btn-full" onclick="saveChore()">Save Chore</button>
+    <button class="btn btn-ghost btn-full" onclick="closeChoreModal()">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, serverTimestamp, getDocs, getDoc, where
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDQhwcgkxst89m4aY2hxLXwaGwP4dDJWaY",
+  authDomain: "list-app-c9d29.firebaseapp.com",
+  projectId: "list-app-c9d29",
+  storageBucket: "list-app-c9d29.firebasestorage.app",
+  messagingSenderId: "31606662627",
+  appId: "1:31606662627:web:0503723562bde9b3962cd6"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+const AVATAR_COLORS = ['#4f8ef7','#e879a0','#3ecf6a','#a78bfa','#f7c94f','#f75a5a','#4fc4cf','#fb923c'];
+const DEFAULT_PEOPLE = ['Dad','Mom','Walker','Karsen','Alana'];
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function showToast(msg, dur=2200) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),dur); }
+function todayStr() { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function dateToStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function formatDate(str) { const d=new Date(str+'T00:00:00'); return MONTH_NAMES[d.getMonth()]+' '+d.getDate(); }
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let people = [];
+let chores = [];
+let completions = {}; // { 'choreId_date': true }
+let weekOffset = 0;
+let currentTab = 'today';
+
+// ── SEED DEFAULT PEOPLE ───────────────────────────────────────────────────────
+async function seedPeople() {
+  const snap = await getDocs(collection(db, 'chorePeople'));
+  if (snap.empty) {
+    for (let i = 0; i < DEFAULT_PEOPLE.length; i++) {
+      await addDoc(collection(db, 'chorePeople'), {
+        name: DEFAULT_PEOPLE[i],
+        color: AVATAR_COLORS[i % AVATAR_COLORS.length],
+        order: i,
+        createdAt: serverTimestamp()
+      });
+    }
+  }
+}
+seedPeople();
+
+// ── REAL-TIME LISTENERS ───────────────────────────────────────────────────────
+onSnapshot(query(collection(db, 'chorePeople'), orderBy('order')), snap => {
+  people = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderAll();
+});
+
+onSnapshot(query(collection(db, 'choreDefinitions'), orderBy('createdAt')), snap => {
+  chores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderAll();
+});
+
+// Load completions for ±2 weeks window
+function loadCompletions() {
+  const base = new Date();
+  base.setDate(base.getDate() + weekOffset * 7);
+  const sun = new Date(base);
+  sun.setDate(sun.getDate() - sun.getDay() - 7);
+  const sat = new Date(sun);
+  sat.setDate(sat.getDate() + 20);
+  const start = dateToStr(sun);
+  const end = dateToStr(sat);
+
+  onSnapshot(
+    query(collection(db, 'choreCompletions'), where('date','>=',start), where('date','<=',end)),
+    snap => {
+      completions = {};
+      snap.docs.forEach(d => { completions[d.id] = true; });
+      renderAll();
+    }
+  );
+}
+loadCompletions();
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────────
+window.switchTab = function(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  renderAll();
+};
+
+function renderAll() {
+  if (currentTab === 'today') renderToday();
+  if (currentTab === 'week') renderWeek();
+  if (currentTab === 'manage') renderManage();
+}
+
+// ── DUE LOGIC ─────────────────────────────────────────────────────────────────
+function isDueOn(chore, dateStr) {
+  if (!chore.active) return false;
+  const d = new Date(dateStr+'T00:00:00');
+  const dow = d.getDay();
+  if (chore.recurrence === 'daily') return true;
+  if (chore.recurrence === 'weekly') return (chore.days||[]).includes(dow);
+  if (chore.recurrence === 'once') return chore.date === dateStr;
+  return false;
+}
+
+function isComplete(choreId, dateStr) {
+  return !!completions[choreId+'_'+dateStr];
+}
+
+// ── TOGGLE COMPLETE ───────────────────────────────────────────────────────────
+window.toggleComplete = async function(choreId, dateStr) {
+  const key = choreId+'_'+dateStr;
+  const ref = doc(db, 'choreCompletions', key);
+  if (completions[key]) {
+    await deleteDoc(ref);
+  } else {
+    await setDoc(ref, { choreId, date: dateStr, completedAt: serverTimestamp() });
+  }
+};
+
+// ── TODAY ─────────────────────────────────────────────────────────────────────
+function renderToday() {
+  const el = document.getElementById('today-content');
+  const today = todayStr();
+  const now = new Date();
+  const dayName = DAY_FULL[now.getDay()];
+  const dateLabel = MONTH_NAMES[now.getMonth()]+' '+now.getDate()+', '+now.getFullYear();
+
+  el.innerHTML = `<div class="today-date">${dayName}, ${dateLabel}</div>`;
+
+  const dueChores = chores.filter(c => isDueOn(c, today));
+  if (dueChores.length === 0) {
+    el.innerHTML += `<div class="no-chores-today">No chores scheduled for today.</div>`;
+    return;
+  }
+
+  // Group by person
+  people.forEach(person => {
+    const mine = dueChores.filter(c => (c.assignees||[]).includes(person.name));
+    if (mine.length === 0) return;
+    const allDone = mine.every(c => isComplete(c.id, today));
+
+    const section = document.createElement('div');
+    section.style.marginBottom = '16px';
+    section.innerHTML = `
+      <div class="person-header">
+        <div class="avatar" style="background:${esc(person.color)}">${esc(person.name[0])}</div>
+        <span class="person-name">${esc(person.name)}</span>
+        ${allDone ? '<span class="all-done">All done ✓</span>' : ''}
+      </div>`;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    mine.forEach(chore => {
+      const done = isComplete(chore.id, today);
+      const row = document.createElement('div');
+      row.className = 'chore-row';
+      row.innerHTML = `
+        <div class="cb ${done?'checked':''}" onclick="toggleComplete('${chore.id}','${today}')"></div>
+        <span class="chore-name ${done?'done':''}">${esc(chore.name)}</span>`;
+      card.appendChild(row);
+    });
+    section.appendChild(card);
+    el.appendChild(section);
+  });
+
+  // Chores with no assignee or assignees not in people list
+  const unassigned = dueChores.filter(c => !(c.assignees||[]).some(a => people.find(p => p.name===a)));
+  if (unassigned.length > 0) {
+    const section = document.createElement('div');
+    section.style.marginBottom = '16px';
+    section.innerHTML = `<div class="person-header"><span class="person-name" style="color:var(--muted)">Unassigned</span></div>`;
+    const card = document.createElement('div');
+    card.className = 'card';
+    unassigned.forEach(chore => {
+      const done = isComplete(chore.id, today);
+      const row = document.createElement('div');
+      row.className = 'chore-row';
+      row.innerHTML = `
+        <div class="cb ${done?'checked':''}" onclick="toggleComplete('${chore.id}','${today}')"></div>
+        <span class="chore-name ${done?'done':''}">${esc(chore.name)}</span>`;
+      card.appendChild(row);
+    });
+    section.appendChild(card);
+    el.appendChild(section);
+  }
+}
+
+// ── WEEK ──────────────────────────────────────────────────────────────────────
+window.changeWeek = function(dir) {
+  weekOffset += dir;
+  loadCompletions();
+  renderWeek();
+};
+
+function getWeekDays() {
+  const base = new Date();
+  base.setDate(base.getDate() + weekOffset * 7);
+  const sun = new Date(base);
+  sun.setDate(sun.getDate() - sun.getDay());
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sun);
+    d.setDate(sun.getDate() + i);
+    days.push(d);
+  }
+  return days;
+}
+
+function renderWeek() {
+  const el = document.getElementById('week-content');
+  const days = getWeekDays();
+  const today = todayStr();
+
+  document.getElementById('week-range-label').textContent =
+    MONTH_NAMES[days[0].getMonth()]+' '+days[0].getDate()+' — '+
+    MONTH_NAMES[days[6].getMonth()]+' '+days[6].getDate();
+
+  el.innerHTML = '';
+
+  days.forEach(dayDate => {
+    const dateStr = dateToStr(dayDate);
+    const isToday = dateStr === today;
+    const dueChores = chores.filter(c => isDueOn(c, dateStr));
+    if (dueChores.length === 0 && !isToday) return;
+
+    const section = document.createElement('div');
+    section.className = 'day-section';
+
+    const label = document.createElement('div');
+    label.className = 'day-label' + (isToday ? ' today-label' : '');
+    label.innerHTML = `${DAY_FULL[dayDate.getDay()]}, ${MONTH_NAMES[dayDate.getMonth()]} ${dayDate.getDate()}
+      ${isToday ? '<span class="day-badge">Today</span>' : ''}`;
+    section.appendChild(label);
+
+    if (dueChores.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:.82rem;color:var(--muted);padding:8px 0 4px';
+      empty.textContent = 'No chores scheduled';
+      section.appendChild(empty);
+    } else {
+      const card = document.createElement('div');
+      card.className = 'card';
+
+      dueChores.forEach(chore => {
+        const done = isComplete(chore.id, dateStr);
+        const assignedPeople = (chore.assignees||[]).map(a => people.find(p=>p.name===a)).filter(Boolean);
+
+        const row = document.createElement('div');
+        row.className = 'chore-row';
+        row.innerHTML = `
+          <div class="cb ${done?'checked':''}" onclick="toggleComplete('${chore.id}','${dateStr}')"></div>
+          <span class="chore-name ${done?'done':''}" style="flex:1">${esc(chore.name)}</span>
+          <div style="display:flex;gap:3px">
+            ${assignedPeople.map(p=>`<div class="avatar avatar-sm" style="background:${esc(p.color)}" title="${esc(p.name)}">${esc(p.name[0])}</div>`).join('')}
+          </div>`;
+        card.appendChild(row);
+      });
+      section.appendChild(card);
+    }
+    el.appendChild(section);
+  });
+
+  if (el.innerHTML === '') {
+    el.innerHTML = '<div class="empty">No chores this week.</div>';
+  }
+}
+
+// ── MANAGE ────────────────────────────────────────────────────────────────────
+function renderManage() {
+  const peopleEl = document.getElementById('people-list');
+  const choresEl = document.getElementById('chores-manage-list');
+
+  if (people.length === 0) {
+    peopleEl.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:4px 0">No people yet.</div>';
+  } else {
+    peopleEl.innerHTML = '';
+    people.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'manage-row';
+      row.innerHTML = `
+        <div class="avatar" style="background:${esc(p.color)}">${esc(p.name[0])}</div>
+        <span class="row-name">${esc(p.name)}</span>
+        <button class="del-btn" onclick="deletePerson('${p.id}','${esc(p.name)}')">✕</button>`;
+      peopleEl.appendChild(row);
+    });
+  }
+
+  if (chores.length === 0) {
+    choresEl.innerHTML = '<div class="empty" style="padding:24px">No chores yet.<br>Tap "+ Add Chore" to get started.</div>';
+  } else {
+    choresEl.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'card';
+    chores.forEach(chore => {
+      const assignedPeople = (chore.assignees||[]).map(a => people.find(p=>p.name===a)).filter(Boolean);
+      let recurLabel = '';
+      if (chore.recurrence === 'daily') recurLabel = 'Daily';
+      else if (chore.recurrence === 'weekly') recurLabel = (chore.days||[]).map(d=>DAY_NAMES[d]).join(', ');
+      else if (chore.recurrence === 'once') recurLabel = chore.date ? formatDate(chore.date) : 'One-time';
+
+      const row = document.createElement('div');
+      row.className = 'manage-row';
+      row.innerHTML = `
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.92rem;margin-bottom:4px">${esc(chore.name)}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${assignedPeople.map(p=>`<div class="avatar avatar-sm" style="background:${esc(p.color)}" title="${esc(p.name)}">${esc(p.name[0])}</div>`).join('')}
+            <span class="recur-badge">${esc(recurLabel)}</span>
+          </div>
+        </div>
+        <button class="del-btn" onclick="deleteChore('${chore.id}')">✕</button>`;
+      card.appendChild(row);
+    });
+    choresEl.appendChild(card);
+  }
+}
+
+// ── PEOPLE ACTIONS ────────────────────────────────────────────────────────────
+window.addPerson = async function() {
+  const inp = document.getElementById('new-person-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (people.find(p => p.name.toLowerCase() === name.toLowerCase())) { showToast('Person already exists'); return; }
+  inp.value = '';
+  const color = AVATAR_COLORS[people.length % AVATAR_COLORS.length];
+  await addDoc(collection(db, 'chorePeople'), { name, color, order: people.length, createdAt: serverTimestamp() });
+};
+
+window.deletePerson = async function(id, name) {
+  if (!confirm(`Remove ${name} from the list?`)) return;
+  await deleteDoc(doc(db, 'chorePeople', id));
+  showToast(`${name} removed`);
+};
+
+// ── CHORE MODAL ───────────────────────────────────────────────────────────────
+let selectedAssignees = new Set();
+let selectedRecur = 'daily';
+let selectedDays = new Set();
+
+window.openChoreModal = function() {
+  selectedAssignees = new Set();
+  selectedRecur = 'daily';
+  selectedDays = new Set();
+  document.getElementById('chore-name-input').value = '';
+  document.getElementById('chore-modal-title').textContent = 'Add Chore';
+  setRecur('daily');
+  buildAssigneeChips();
+  buildDayChips();
+  document.getElementById('chore-modal').classList.add('open');
+};
+
+window.closeChoreModal = function() {
+  document.getElementById('chore-modal').classList.remove('open');
+};
+
+function buildAssigneeChips() {
+  const el = document.getElementById('assignee-chips');
+  el.innerHTML = '';
+  people.forEach(p => {
+    const chip = document.createElement('div');
+    chip.className = 'chip person-chip' + (selectedAssignees.has(p.name) ? ' selected' : '');
+    chip.style.background = selectedAssignees.has(p.name) ? p.color : 'transparent';
+    chip.style.borderColor = selectedAssignees.has(p.name) ? p.color : 'var(--border)';
+    chip.style.color = selectedAssignees.has(p.name) ? '#000' : 'var(--muted)';
+    chip.textContent = p.name;
+    chip.onclick = () => {
+      selectedAssignees.has(p.name) ? selectedAssignees.delete(p.name) : selectedAssignees.add(p.name);
+      buildAssigneeChips();
+    };
+    el.appendChild(chip);
+  });
+}
+
+function buildDayChips() {
+  const el = document.getElementById('day-chips');
+  el.innerHTML = '';
+  DAY_NAMES.forEach((name, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (selectedDays.has(i) ? ' selected' : '');
+    chip.textContent = name;
+    chip.onclick = () => {
+      selectedDays.has(i) ? selectedDays.delete(i) : selectedDays.add(i);
+      buildDayChips();
+    };
+    el.appendChild(chip);
+  });
+}
+
+window.setRecur = function(type) {
+  selectedRecur = type;
+  ['daily','weekly','once'].forEach(t => {
+    document.getElementById('recur-'+t).classList.toggle('selected', t===type);
+  });
+  document.getElementById('weekly-day-picker').style.display = type==='weekly' ? 'block' : 'none';
+  document.getElementById('once-date-picker').style.display = type==='once' ? 'block' : 'none';
+};
+
+window.saveChore = async function() {
+  const name = document.getElementById('chore-name-input').value.trim();
+  if (!name) { showToast('Enter a chore name'); return; }
+  if (selectedAssignees.size === 0) { showToast('Assign to at least one person'); return; }
+  if (selectedRecur === 'weekly' && selectedDays.size === 0) { showToast('Pick at least one day'); return; }
+
+  const data = {
+    name,
+    assignees: [...selectedAssignees],
+    recurrence: selectedRecur,
+    active: true,
+    createdAt: serverTimestamp()
+  };
+  if (selectedRecur === 'weekly') data.days = [...selectedDays].sort();
+  if (selectedRecur === 'once') data.date = document.getElementById('once-date-input').value;
+
+  await addDoc(collection(db, 'choreDefinitions'), data);
+  closeChoreModal();
+  showToast('Chore added!');
+  switchTab('manage');
+};
+
+window.deleteChore = async function(id) {
+  if (!confirm('Delete this chore?')) return;
+  await deleteDoc(doc(db, 'choreDefinitions', id));
+  showToast('Chore deleted');
+};
+
+</script>
+</body>
+</html>
