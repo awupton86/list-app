@@ -1,0 +1,294 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <title>Appointments · Upton ∞ +1</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;--text:#e8e8e8;--muted:#888;--accent:#a78bfa;--green:#3ecf6a;--red:#f75a5a;--radius:14px; }
+    body { background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100dvh;display:flex;flex-direction:column; }
+    nav { background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;height:56px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100; }
+    .back { font-size:.8rem;color:var(--accent);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px; }
+    .nav-title { flex:1;font-size:1.1rem;font-weight:700; }
+    .tabs { display:flex;background:var(--surface);border-bottom:1px solid var(--border); }
+    .tab { flex:1;text-align:center;padding:12px 4px;font-size:.82rem;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s; }
+    .tab.active { color:var(--accent);border-bottom-color:var(--accent); }
+    main { flex:1;overflow-y:auto;padding:16px;max-width:640px;width:100%;margin:0 auto; }
+    .page { display:none; } .page.active { display:block; }
+
+    .appt-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden; }
+    .appt-card .color-bar { position:absolute;left:0;top:0;bottom:0;width:4px; }
+    .appt-card .appt-inner { padding-left:10px; }
+    .appt-title { font-size:.95rem;font-weight:700;margin-bottom:4px; }
+    .appt-meta { display:flex;flex-wrap:wrap;gap:8px;font-size:.75rem;color:var(--muted); }
+    .appt-meta span { display:flex;align-items:center;gap:3px; }
+    .appt-notes { font-size:.8rem;color:var(--muted);margin-top:6px;line-height:1.4; }
+    .appt-actions { display:flex;gap:8px;margin-top:10px; }
+    .ics-btn { font-size:.75rem;color:var(--accent);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);border-radius:8px;padding:4px 10px;cursor:pointer;text-decoration:none;display:inline-block; }
+    .del-appt { font-size:.75rem;color:var(--muted);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;cursor:pointer; }
+    .del-appt:hover { color:var(--red); }
+
+    .upcoming-label { font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px; }
+    .past-label { font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 8px;opacity:.6; }
+
+    .cal-nav { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px; }
+    .cal-month { font-size:.95rem;font-weight:700; }
+    .cal-btn { background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:.85rem; }
+    .cal-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:16px; }
+    .cal-day-label { text-align:center;font-size:.68rem;color:var(--muted);font-weight:600;padding:4px 0;text-transform:uppercase; }
+    .cal-day { aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;cursor:pointer;position:relative;transition:background .1s; }
+    .cal-day:hover { background:var(--surface2); }
+    .cal-day.today { background:var(--accent);color:#fff;font-weight:700; }
+    .cal-day.has-appt::after { content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--green); }
+    .cal-day.today.has-appt::after { background:#fff; }
+    .cal-day.other-month { color:#444; }
+    .cal-day.selected { background:rgba(167,139,250,.2);border:1px solid var(--accent); }
+
+    .form-group { margin-bottom:14px; }
+    .form-label { font-size:.78rem;color:var(--muted);margin-bottom:6px;display:block; }
+    input[type=text],input[type=date],input[type=time],select,textarea { background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:10px 14px;font-size:.9rem;font-family:inherit;outline:none;transition:border-color .15s;width:100%;color-scheme:dark; }
+    input:focus,select:focus,textarea:focus { border-color:var(--accent); }
+    textarea { min-height:70px;resize:vertical; }
+    .form-row { display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+
+    .btn { display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:var(--radius);font-size:.88rem;font-weight:600;cursor:pointer;border:none;transition:all .15s; }
+    .btn-primary { background:var(--accent);color:#fff; }
+    .btn-ghost { background:var(--surface2);color:var(--text);border:1px solid var(--border); }
+    .btn-full { width:100%;margin-top:8px; }
+
+    .color-picker { display:flex;gap:8px;flex-wrap:wrap; }
+    .color-opt { width:28px;height:28px;border-radius:50%;cursor:pointer;transition:transform .15s;border:2px solid transparent; }
+    .color-opt.selected { border-color:var(--text);transform:scale(1.15); }
+
+    .person-chips { display:flex;gap:6px;flex-wrap:wrap; }
+    .pchip { padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:.8rem;transition:all .15s; }
+    .pchip.selected { border-color:var(--accent);color:var(--text);background:rgba(167,139,250,.15); }
+
+    .empty { text-align:center;color:var(--muted);padding:40px 16px;font-size:.88rem;line-height:1.6; }
+    .toast { position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:30px;font-size:.85rem;font-weight:500;z-index:300;transition:transform .3s;white-space:nowrap; }
+    .toast.show { transform:translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<script>(function(){try{var s=JSON.parse(localStorage.getItem('hm_session'));if(!s||!s.user||Date.now()>s.exp){location.href='index.html';}}catch(e){location.href='index.html';}})();</script>
+<nav>
+  <a class="back" href="index.html">← Home</a>
+  <span class="nav-title">📅 Appointments</span>
+</nav>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('upcoming')" id="tab-upcoming">Upcoming</div>
+  <div class="tab" onclick="switchTab('calendar')" id="tab-calendar">Calendar</div>
+  <div class="tab" onclick="switchTab('add')" id="tab-add">+ Add</div>
+</div>
+<main>
+  <div class="page active" id="page-upcoming">
+    <div id="upcoming-content"><div style="text-align:center;color:var(--muted);padding:40px">Loading…</div></div>
+  </div>
+  <div class="page" id="page-calendar">
+    <div class="cal-nav">
+      <button class="cal-btn" onclick="changeMonth(-1)">←</button>
+      <span class="cal-month" id="cal-month-label"></span>
+      <button class="cal-btn" onclick="changeMonth(1)">→</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div id="cal-day-appts"></div>
+  </div>
+  <div class="page" id="page-add">
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input type="text" id="appt-title" placeholder="Doctor, Dentist, Meeting…" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" id="appt-date" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time</label>
+        <input type="time" id="appt-time" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Who</label>
+      <div class="person-chips" id="person-chips"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Color</label>
+      <div class="color-picker" id="color-picker"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <textarea id="appt-notes" placeholder="Location, address, what to bring…"></textarea>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="saveAppt()">Save Appointment</button>
+    <button class="btn btn-ghost btn-full" onclick="clearForm()">Clear</button>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore,collection,doc,addDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp,getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = { apiKey:"AIzaSyDQhwcgkxst89m4aY2hxLXwaGwP4dDJWaY",authDomain:"list-app-c9d29.firebaseapp.com",projectId:"list-app-c9d29",storageBucket:"list-app-c9d29.firebasestorage.app",messagingSenderId:"31606662627",appId:"1:31606662627:web:0503723562bde9b3962cd6" };
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const FC = (()=>{try{return JSON.parse(localStorage.getItem('hm_session')).familyCode||'default';}catch(e){return 'default';}})();
+
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_S=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const COLORS=['#a78bfa','#4f8ef7','#3ecf6a','#f97316','#f7c94f','#e879a0','#f75a5a','#4fc4cf'];
+const PEOPLE=['Dad','Mom','Walker','Karsen','Alana','All'];
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+let appointments=[], calOffset=0, selectedColor=COLORS[0], selectedPeople=[], selectedCalDay=null, currentTab='upcoming';
+
+onSnapshot(query(collection(db,'families',FC,'appointments'),orderBy('date')), snap=>{
+  appointments=snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderAll();
+});
+
+window.switchTab=function(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  if(tab==='add') initForm();
+  renderAll();
+};
+
+function renderAll(){
+  if(currentTab==='upcoming') renderUpcoming();
+  if(currentTab==='calendar') renderCalendar();
+}
+
+function renderUpcoming(){
+  const el=document.getElementById('upcoming-content');
+  const today=todayStr();
+  const upcoming=appointments.filter(a=>a.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+  const past=appointments.filter(a=>a.date<today).sort((a,b)=>b.date.localeCompare(a.date));
+  el.innerHTML='';
+  if(upcoming.length===0&&past.length===0){ el.innerHTML='<div class="empty">No appointments yet.<br>Tap <strong>+ Add</strong> to schedule one.</div>'; return; }
+  if(upcoming.length>0){
+    const lbl=document.createElement('div'); lbl.className='upcoming-label'; lbl.textContent='Upcoming'; el.appendChild(lbl);
+    upcoming.forEach(a=>el.appendChild(apptCard(a)));
+  }
+  if(past.length>0){
+    const lbl=document.createElement('div'); lbl.className='past-label'; lbl.textContent='Past'; el.appendChild(lbl);
+    past.slice(0,5).forEach(a=>el.appendChild(apptCard(a,true)));
+  }
+}
+
+function apptCard(a,past=false){
+  const div=document.createElement('div'); div.className='appt-card';
+  div.style.opacity=past?'.5':'1';
+  const dateObj=new Date(a.date+'T00:00:00');
+  const dateLabel=MONTHS_S[dateObj.getMonth()]+' '+dateObj.getDate()+', '+dateObj.getFullYear();
+  const timeLabel=a.time?formatTime(a.time):'';
+  div.innerHTML=`
+    <div class="color-bar" style="background:${esc(a.color||COLORS[0])}"></div>
+    <div class="appt-inner">
+      <div class="appt-title">${esc(a.title)}</div>
+      <div class="appt-meta">
+        <span>📅 ${dateLabel}</span>
+        ${timeLabel?`<span>🕐 ${timeLabel}</span>`:''}
+        ${a.people&&a.people.length?`<span>👤 ${a.people.join(', ')}</span>`:''}
+      </div>
+      ${a.notes?`<div class="appt-notes">${esc(a.notes)}</div>`:''}
+      <div class="appt-actions">
+        <a class="ics-btn" href="${makeICS(a)}" download="${esc(a.title.replace(/\s+/g,'-'))}.ics">📆 Add to Calendar</a>
+        <span class="del-appt" onclick="deleteAppt('${a.id}')">Delete</span>
+      </div>
+    </div>`;
+  return div;
+}
+
+function formatTime(t){ if(!t) return ''; const [h,m]=t.split(':'); const hr=parseInt(h); return (hr>12?hr-12:hr||12)+':'+m+(hr>=12?'pm':'am'); }
+
+function makeICS(a){
+  const dt=a.date.replace(/-/g,'');
+  const start=a.time ? dt+'T'+a.time.replace(':','')+':00' : dt;
+  const end=a.time ? dt+'T'+(String(parseInt(a.time.split(':')[0])+1).padStart(2,'0'))+a.time.slice(2)+'00' : dt;
+  const allDay=!a.time;
+  const ics=`BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${a.title}\n${allDay?'DTSTART;VALUE=DATE:'+start+'\nDTEND;VALUE=DATE:'+end:'DTSTART:'+start+'\nDTEND:'+end}\nDESCRIPTION:${a.notes||''}\nEND:VEVENT\nEND:VCALENDAR`;
+  return 'data:text/calendar;charset=utf8,'+encodeURIComponent(ics);
+}
+
+window.deleteAppt=async function(id){ if(!confirm('Delete this appointment?')) return; await deleteDoc(doc(db,'families',FC,'appointments',id)); showToast('Deleted'); };
+
+// CALENDAR
+window.changeMonth=function(dir){ calOffset+=dir; renderCalendar(); };
+function renderCalendar(){
+  const now=new Date(); now.setDate(1); now.setMonth(now.getMonth()+calOffset);
+  const year=now.getFullYear(), month=now.getMonth();
+  document.getElementById('cal-month-label').textContent=MONTHS[month]+' '+year;
+  const el=document.getElementById('cal-grid'); el.innerHTML='';
+  DAYS_S.forEach(d=>{ const lbl=document.createElement('div'); lbl.className='cal-day-label'; lbl.textContent=d; el.appendChild(lbl); });
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const today=todayStr();
+  for(let i=0;i<firstDay;i++){ const d=document.createElement('div'); d.className='cal-day other-month'; el.appendChild(d); }
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const hasAppt=appointments.some(a=>a.date===dateStr);
+    const div=document.createElement('div');
+    div.className='cal-day'+(dateStr===today?' today':'')+(hasAppt?' has-appt':'')+(selectedCalDay===dateStr?' selected':'');
+    div.textContent=d;
+    div.onclick=()=>{ selectedCalDay=selectedCalDay===dateStr?null:dateStr; renderCalendar(); showCalDayAppts(dateStr); };
+    el.appendChild(div);
+  }
+}
+
+function showCalDayAppts(dateStr){
+  const el=document.getElementById('cal-day-appts');
+  const dayAppts=appointments.filter(a=>a.date===dateStr);
+  if(dayAppts.length===0){ el.innerHTML=''; return; }
+  el.innerHTML='';
+  const dateObj=new Date(dateStr+'T00:00:00');
+  const lbl=document.createElement('div'); lbl.className='upcoming-label';
+  lbl.textContent=MONTHS_S[dateObj.getMonth()]+' '+dateObj.getDate(); el.appendChild(lbl);
+  dayAppts.forEach(a=>el.appendChild(apptCard(a)));
+}
+
+// ADD FORM
+function initForm(){
+  const today=new Date(); const dd=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  document.getElementById('appt-date').value=dd;
+  renderColorPicker(); renderPersonChips();
+}
+function renderColorPicker(){
+  const el=document.getElementById('color-picker'); el.innerHTML='';
+  COLORS.forEach(c=>{ const d=document.createElement('div'); d.className='color-opt'+(selectedColor===c?' selected':''); d.style.background=c; d.onclick=()=>{ selectedColor=c; renderColorPicker(); }; el.appendChild(d); });
+}
+function renderPersonChips(){
+  const el=document.getElementById('person-chips'); el.innerHTML='';
+  PEOPLE.forEach(p=>{ const d=document.createElement('div'); d.className='pchip'+(selectedPeople.includes(p)?' selected':''); d.textContent=p; d.onclick=()=>{ const i=selectedPeople.indexOf(p); i>-1?selectedPeople.splice(i,1):selectedPeople.push(p); renderPersonChips(); }; el.appendChild(d); });
+}
+
+window.saveAppt=async function(){
+  const title=document.getElementById('appt-title').value.trim();
+  const date=document.getElementById('appt-date').value;
+  if(!title){ showToast('Enter a title'); return; }
+  if(!date){ showToast('Pick a date'); return; }
+  await addDoc(collection(db,'families',FC,'appointments'),{title,date,time:document.getElementById('appt-time').value||'',notes:document.getElementById('appt-notes').value.trim(),people:selectedPeople,color:selectedColor,createdAt:serverTimestamp()});
+  showToast('Appointment saved!'); clearForm(); switchTab('upcoming');
+};
+
+window.clearForm=function(){
+  document.getElementById('appt-title').value='';
+  document.getElementById('appt-time').value='';
+  document.getElementById('appt-notes').value='';
+  selectedPeople=[]; selectedColor=COLORS[0];
+  initForm();
+};
+initForm();
+</script>
+</body>
+</html>

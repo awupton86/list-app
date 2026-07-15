@@ -1,0 +1,860 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>ListRun</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f0f0f;
+      --surface:  #1a1a1a;
+      --surface2: #242424;
+      --border:   #2e2e2e;
+      --text:     #e8e8e8;
+      --muted:    #888;
+      --accent:   #4f8ef7;
+      --accent2:  #3a7de0;
+      --green:    #3ecf6a;
+      --red:      #f75a5a;
+      --yellow:   #f7c94f;
+      --radius:   12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* NAV */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    nav .logo { font-size: 1.2rem; font-weight: 700; letter-spacing: -.5px; color: var(--accent); flex: 1; }
+    nav .board-id { font-size: .72rem; color: var(--muted); cursor: pointer; border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
+    nav .board-id:hover { border-color: var(--accent); color: var(--text); }
+
+    /* TABS */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1; text-align: center; padding: 12px 4px;
+      font-size: .82rem; font-weight: 500; color: var(--muted);
+      cursor: pointer; border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* MAIN */
+    main { flex: 1; overflow-y: auto; padding: 16px; max-width: 640px; width: 100%; margin: 0 auto; }
+
+    /* SECTION HEADERS */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-header h2 { font-size: .85rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+    /* CARDS */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      margin-bottom: 8px;
+    }
+
+    /* ITEM ROW */
+    .item-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .item-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .item-row:first-child { padding-top: 0; }
+
+    .item-name { flex: 1; font-size: .95rem; }
+    .item-name.strike { text-decoration: line-through; color: var(--muted); }
+
+    /* CHECKBOX */
+    .cb {
+      width: 22px; height: 22px; border-radius: 6px;
+      border: 2px solid var(--border); background: transparent;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: background .15s, border-color .15s;
+    }
+    .cb.checked { background: var(--green); border-color: var(--green); }
+    .cb.checked::after { content: '✓'; color: #fff; font-size: .85rem; font-weight: 700; }
+
+    /* SELECT TOGGLE (master list) */
+    .sel-btn {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid var(--border); background: transparent;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: .8rem; transition: all .15s;
+    }
+    .sel-btn.selected { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 10px 18px; border-radius: var(--radius);
+      font-size: .88rem; font-weight: 600; cursor: pointer;
+      border: none; transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent2); }
+    .btn-success { background: var(--green); color: #000; }
+    .btn-danger  { background: var(--red);   color: #fff; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm { padding: 6px 12px; font-size: .8rem; }
+    .btn-full { width: 100%; margin-top: 12px; }
+
+    /* INPUT */
+    .input-row { display: flex; gap: 8px; margin-bottom: 16px; }
+    input[type=text], textarea {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: var(--radius);
+      padding: 10px 14px; font-size: .9rem; font-family: inherit;
+      outline: none; transition: border-color .15s;
+    }
+    input[type=text] { flex: 1; }
+    input[type=text]:focus, textarea:focus { border-color: var(--accent); }
+    textarea { width: 100%; resize: vertical; min-height: 70px; margin-top: 8px; }
+
+    /* NOTES */
+    .notes-toggle { font-size: .75rem; color: var(--accent); cursor: pointer; margin-left: auto; padding: 2px 6px; }
+    .notes-area { display: none; }
+    .notes-area.open { display: block; }
+
+    /* BADGE */
+    .badge {
+      font-size: .72rem; font-weight: 700; padding: 2px 7px;
+      border-radius: 20px; background: var(--surface2); color: var(--muted);
+    }
+    .badge.green { background: rgba(62,207,106,.15); color: var(--green); }
+
+    /* ARCHIVE CARD */
+    .archive-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px;
+      cursor: pointer;
+    }
+    .archive-card .arc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .archive-card .arc-date { font-size: .78rem; color: var(--muted); }
+    .archive-card .arc-name { font-size: .95rem; font-weight: 600; flex: 1; }
+    .archive-card .arc-items { font-size: .8rem; color: var(--muted); }
+    .archive-detail { display: none; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .archive-detail.open { display: block; }
+    .arc-item-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: .88rem; }
+    .arc-item-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-done { background: var(--green); }
+    .dot-skip { background: var(--muted); }
+
+    /* MODAL */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 200; opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface); border-radius: var(--radius) var(--radius) 0 0;
+      padding: 24px 20px 32px; width: 100%; max-width: 640px;
+      transform: translateY(40px); transition: transform .25s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal h3 { font-size: 1.05rem; margin-bottom: 8px; }
+    .modal p  { font-size: .88rem; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+    .modal-btns { display: flex; gap: 10px; flex-direction: column; }
+
+    /* TOAST */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 20px; border-radius: 30px;
+      font-size: .85rem; font-weight: 500; z-index: 300;
+      transition: transform .3s; white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* EMPTY */
+    .empty { text-align: center; color: var(--muted); padding: 48px 16px; font-size: .9rem; line-height: 1.6; }
+
+    /* LOADER */
+    .loader { text-align: center; padding: 48px; color: var(--muted); }
+
+    /* BOARD SWITCHER */
+    .board-box { background: var(--surface2); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+    .board-box p { font-size: .82rem; color: var(--muted); margin-bottom: 8px; }
+    .board-id-display { font-family: monospace; font-size: 1.1rem; color: var(--accent); letter-spacing: .1em; }
+    .board-list-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-radius: 10px; cursor: pointer;
+      background: var(--surface2); border: 1px solid var(--border); margin-bottom: 8px;
+      transition: border-color .15s;
+    }
+    .board-list-item:hover { border-color: var(--accent); }
+    .board-list-item.active-board { border-color: var(--accent); background: rgba(79,142,247,.08); }
+    .board-list-item .board-name { font-size: .95rem; font-weight: 500; }
+    .board-list-item .board-check { color: var(--accent); font-size: 1.1rem; }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* run count pill in tabs */
+    .tab-pill {
+      display: inline-block; background: var(--accent); color: #fff;
+      border-radius: 10px; font-size: .65rem; padding: 1px 6px;
+      margin-left: 4px; vertical-align: middle; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+<script>(function(){try{var s=JSON.parse(localStorage.getItem('hm_session'));if(!s||!s.user||Date.now()>s.exp){location.href='index.html';}}catch(e){location.href='index.html';}})();</script>
+<nav>
+  <span class="logo" style="display:flex;align-items:center;gap:6px">
+    <span>ListRun</span>
+    <span style="color:#444">·</span>
+    <span style="font-weight:700;letter-spacing:.08em">UPTON</span>
+    <span style="font-size:1.5rem;line-height:1;color:#4f8ef7;font-weight:700">∞</span>
+    <span style="color:#888;font-weight:400">+</span>
+    <span style="font-weight:700">1</span>
+  </span>
+  <a href="chores.html" style="font-size:.8rem;color:var(--accent);text-decoration:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;white-space:nowrap">Chores</a>
+  <span class="board-id" onclick="openBoardModal()" title="Tap to switch board">
+    Board: <span id="nav-board-id">—</span>
+  </span>
+</nav>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('master')" id="tab-master">Items</div>
+  <div class="tab" onclick="switchTab('run')" id="tab-run">Run <span class="tab-pill" id="run-pill" style="display:none"></span></div>
+  <div class="tab" onclick="switchTab('archive')" id="tab-archive">Archive</div>
+</div>
+
+<main>
+
+  <!-- MASTER LIST TAB -->
+  <div class="page active" id="page-master">
+    <div class="input-row">
+      <input type="text" id="master-input" placeholder="Add item to your list…" maxlength="80"
+             onkeydown="if(event.key==='Enter') addMasterItem()" />
+      <button class="btn btn-primary" onclick="addMasterItem()">Add</button>
+    </div>
+    <div class="section-header">
+      <h2>Your Items</h2>
+      <button class="btn btn-primary btn-sm" onclick="buildRun()" id="build-run-btn" style="display:none">Start Run →</button>
+    </div>
+    <div id="master-list"><div class="loader">Loading…</div></div>
+  </div>
+
+  <!-- RUN TAB -->
+  <div class="page" id="page-run">
+    <div id="run-content"><div class="loader">Loading…</div></div>
+  </div>
+
+  <!-- ARCHIVE TAB -->
+  <div class="page" id="page-archive">
+    <div class="section-header"><h2>Completed Runs</h2></div>
+    <div id="archive-list"><div class="loader">Loading…</div></div>
+  </div>
+
+</main>
+
+<!-- COMPLETE MODAL -->
+<div class="modal-overlay" id="complete-modal">
+  <div class="modal">
+    <h3>Complete this run?</h3>
+    <p id="complete-modal-msg">Some items are still unchecked. What would you like to do with them?</p>
+    <div class="modal-btns" id="complete-modal-btns"></div>
+  </div>
+</div>
+
+<!-- BOARD MODAL -->
+<div class="modal-overlay" id="board-modal">
+  <div class="modal">
+    <h3>Switch Board</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Select a board or create a new one:</p>
+    <div id="board-list-items"></div>
+    <div class="input-row" style="margin-top:8px">
+      <input type="text" id="board-switch-input" placeholder="New board name…" maxlength="30" />
+      <button class="btn btn-primary" onclick="createBoard()">Create</button>
+    </div>
+    <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeBoardModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc,
+  onSnapshot, query, orderBy, serverTimestamp, getDoc, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ─── PASTE YOUR FIREBASE CONFIG HERE ────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDQhwcgkxst89m4aY2hxLXwaGwP4dDJWaY",
+  authDomain: "list-app-c9d29.firebaseapp.com",
+  projectId: "list-app-c9d29",
+  storageBucket: "list-app-c9d29.firebasestorage.app",
+  messagingSenderId: "31606662627",
+  appId: "1:31606662627:web:0503723562bde9b3962cd6"
+};
+// ────────────────────────────────────────────────────────────────────────────
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+const FC = (()=>{try{return JSON.parse(localStorage.getItem('hm_session')).familyCode||'default';}catch(e){return 'default';}})();
+
+// ── BOARD NAME (localStorage + URL param) ────────────────────────────────────
+function getBoardName() {
+  const params = new URLSearchParams(location.search);
+  return params.get('board') || localStorage.getItem('boardName') || null;
+}
+function saveBoardName(name) {
+  localStorage.setItem('boardName', name);
+  history.replaceState({}, '', '?board=' + encodeURIComponent(name));
+}
+function slugify(name) {
+  return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+// Track all known boards in localStorage
+function getKnownBoards() {
+  try { return JSON.parse(localStorage.getItem('knownBoards') || '[]'); } catch { return []; }
+}
+function addKnownBoard(name) {
+  const boards = getKnownBoards();
+  if (!boards.includes(name)) { boards.push(name); localStorage.setItem('knownBoards', JSON.stringify(boards)); }
+}
+
+let BOARD = getBoardName();
+
+// First visit — show board modal immediately
+if (!BOARD) {
+  window.addEventListener('DOMContentLoaded', () => openBoardModal(true));
+  BOARD = '__none__';
+}
+
+if (BOARD && BOARD !== '__none__') {
+  addKnownBoard(BOARD); // auto-save if joined via URL
+  document.getElementById('nav-board-id').textContent = BOARD;
+} else {
+  document.getElementById('nav-board-id').textContent = 'Pick board';
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function boardSlug() { return slugify(BOARD); }
+function colRef(...segs) { return collection(db, 'boards', boardSlug(), ...segs); }
+function docRef(...segs) { return doc(db, 'boards', boardSlug(), ...segs); }
+
+function showToast(msg, dur = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── CURRENT TAB ──────────────────────────────────────────────────────────────
+let currentTab = 'master';
+window.switchTab = function(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+// MASTER LIST
+// ════════════════════════════════════════════════════════════════════════════
+let masterItems = [];
+let selectedForRun = new Set();
+
+onSnapshot(query(colRef('masterItems'), orderBy('createdAt')), snap => {
+  masterItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderMaster();
+});
+
+function renderMaster() {
+  const el = document.getElementById('master-list');
+  if (masterItems.length === 0) {
+    el.innerHTML = `<div class="empty">No items yet.<br>Add something above to get started.</div>`;
+    document.getElementById('build-run-btn').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('build-run-btn').style.display =
+    selectedForRun.size > 0 ? 'inline-flex' : 'none';
+
+  el.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  masterItems.forEach(item => {
+    const sel = selectedForRun.has(item.id);
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <div class="sel-btn ${sel ? 'selected' : ''}" onclick="toggleSelect('${item.id}')">
+        ${sel ? '✓' : '+'}
+      </div>
+      <span class="item-name">${esc(item.name)}</span>
+      <button class="btn btn-ghost btn-sm" onclick="deleteMasterItem('${item.id}')">✕</button>
+    `;
+    card.appendChild(row);
+  });
+  el.appendChild(card);
+
+  if (selectedForRun.size > 0) {
+    const hint = document.createElement('p');
+    hint.style.cssText = 'text-align:center;color:var(--muted);font-size:.8rem;margin-top:8px';
+    hint.textContent = `${selectedForRun.size} item${selectedForRun.size > 1 ? 's' : ''} selected`;
+    el.appendChild(hint);
+  }
+}
+
+window.toggleSelect = function(id) {
+  selectedForRun.has(id) ? selectedForRun.delete(id) : selectedForRun.add(id);
+  renderMaster();
+};
+
+window.addMasterItem = async function() {
+  const inp = document.getElementById('master-input');
+  const name = inp.value.trim();
+  if (!name) return;
+  inp.value = '';
+  await addDoc(colRef('masterItems'), { name, createdAt: serverTimestamp() });
+};
+
+window.deleteMasterItem = async function(id) {
+  await deleteDoc(docRef('masterItems', id));
+  selectedForRun.delete(id);
+};
+
+window.buildRun = async function() {
+  if (selectedForRun.size === 0) return;
+  const newItems = masterItems
+    .filter(i => selectedForRun.has(i.id))
+    .map(i => ({ id: i.id, name: i.name, checked: false, note: '' }));
+
+  if (activeRuns.length === 0) {
+    // No existing runs — just create one
+    await addDoc(colRef('activeRuns'), { items: newItems, createdAt: serverTimestamp(), note: '', label: '' });
+    selectedForRun.clear();
+    renderMaster();
+    switchTab('run');
+    showToast('Run started!');
+  } else {
+    // Show prompt — add to existing or new
+    pendingNewItems = newItems;
+    openAddToRunModal();
+  }
+};
+
+let pendingNewItems = [];
+
+function openAddToRunModal() {
+  const modal = document.getElementById('complete-modal');
+  const msg = document.getElementById('complete-modal-msg');
+  const btns = document.getElementById('complete-modal-btns');
+  msg.textContent = 'You have active runs. What would you like to do?';
+  btns.innerHTML = '';
+
+  activeRuns.forEach((run, idx) => {
+    const label = run.label || `Run ${idx + 1} (${run.items.length} items)`;
+    addModalBtn(btns, `Add to: ${label}`, 'btn-primary', async () => {
+      closeCMod();
+      const merged = [...run.items, ...pendingNewItems.filter(ni => !run.items.find(ri => ri.id === ni.id))];
+      await updateDoc(docRef('activeRuns', run.docId), { items: merged });
+      pendingNewItems = [];
+      selectedForRun.clear();
+      renderMaster();
+      switchTab('run');
+      showToast('Items added to run!');
+    });
+  });
+
+  addModalBtn(btns, 'Start a new run', 'btn-ghost', async () => {
+    closeCMod();
+    await addDoc(colRef('activeRuns'), { items: pendingNewItems, createdAt: serverTimestamp(), note: '', label: '' });
+    pendingNewItems = [];
+    selectedForRun.clear();
+    renderMaster();
+    switchTab('run');
+    showToast('New run started!');
+  });
+  addModalBtn(btns, 'Cancel', 'btn-ghost', closeCMod);
+  modal.classList.add('open');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ACTIVE RUNS (multiple)
+// ════════════════════════════════════════════════════════════════════════════
+let activeRuns = [];
+let openNotes = {}; // { docId: Set of indices }
+
+onSnapshot(query(colRef('activeRuns'), orderBy('createdAt')), snap => {
+  activeRuns = snap.docs.map(d => ({ docId: d.id, ...d.data() }));
+  renderRun();
+  const pill = document.getElementById('run-pill');
+  const totalUnchecked = activeRuns.reduce((sum, r) => sum + r.items.filter(i => !i.checked).length, 0);
+  if (activeRuns.length > 0) {
+    pill.textContent = totalUnchecked;
+    pill.style.display = 'inline-block';
+  } else {
+    pill.style.display = 'none';
+  }
+});
+
+function renderRun() {
+  const el = document.getElementById('run-content');
+  if (activeRuns.length === 0) {
+    el.innerHTML = `<div class="empty">No active runs.<br>Go to <strong>Items</strong>, select what you need, then tap <strong>Start Run</strong>.</div>`;
+    return;
+  }
+  el.innerHTML = '';
+  activeRuns.forEach((run, runIdx) => renderRunCard(el, run, runIdx));
+}
+
+function renderRunCard(container, run, runIdx) {
+  const items = run.items;
+  const done = items.filter(i => i.checked).length;
+  const pct = items.length ? Math.round(done / items.length * 100) : 0;
+  const notes = openNotes[run.docId] || new Set();
+
+  const wrap = document.createElement('div');
+  wrap.style.marginBottom = '24px';
+
+  // Header with label
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px';
+  header.innerHTML = `
+    <div style="font-size:.82rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">
+      Run ${runIdx + 1}${run.label ? ' — ' + esc(run.label) : ''}
+    </div>
+    <div style="font-size:.78rem;color:var(--muted)">${done}/${items.length} · ${pct}%</div>`;
+  wrap.appendChild(header);
+
+  // Progress bar
+  const bar = document.createElement('div');
+  bar.style.cssText = 'height:6px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:12px';
+  bar.innerHTML = `<div style="height:100%;width:${pct}%;background:var(--green);border-radius:4px;transition:width .3s"></div>`;
+  wrap.appendChild(bar);
+
+  // Items card
+  const card = document.createElement('div');
+  card.className = 'card';
+  items.forEach((item, idx) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.style.flexWrap = 'wrap';
+    const noteOpen = notes.has(idx);
+    row.innerHTML = `
+      <div class="cb ${item.checked ? 'checked' : ''}" onclick="toggleCheck('${run.docId}',${idx})"></div>
+      <span class="item-name ${item.checked ? 'strike' : ''}">${esc(item.name)}</span>
+      <span class="notes-toggle" onclick="toggleNote('${run.docId}',${idx})">${item.note ? '📝' : '+ note'}</span>
+      <div class="notes-area ${noteOpen ? 'open' : ''}" style="width:100%;padding-left:32px">
+        <textarea placeholder="Add a note…" onchange="saveNote('${run.docId}',${idx},this.value)">${esc(item.note || '')}</textarea>
+      </div>`;
+    card.appendChild(row);
+  });
+  wrap.appendChild(card);
+
+  // Run note
+  const noteWrap = document.createElement('div');
+  noteWrap.style.marginTop = '10px';
+  noteWrap.innerHTML = `
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:6px">Run notes</p>
+    <textarea placeholder="Notes for this run…" onchange="saveRunNote('${run.docId}',this.value)">${esc(run.note || '')}</textarea>`;
+  wrap.appendChild(noteWrap);
+
+  // Buttons row
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;margin-top:10px';
+
+  const completeBtn = document.createElement('button');
+  completeBtn.className = 'btn btn-success';
+  completeBtn.style.flex = '1';
+  completeBtn.textContent = '✓ Complete';
+  completeBtn.onclick = () => initiateComplete(run);
+  btnRow.appendChild(completeBtn);
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn-danger';
+  cancelBtn.style.flex = '1';
+  cancelBtn.textContent = '✕ Cancel Run';
+  cancelBtn.onclick = () => initiateCancel(run);
+  btnRow.appendChild(cancelBtn);
+
+  wrap.appendChild(btnRow);
+
+  // Divider between runs
+  if (activeRuns.length > 1) {
+    wrap.style.borderBottom = '1px solid var(--border)';
+    wrap.style.paddingBottom = '24px';
+  }
+
+  container.appendChild(wrap);
+}
+
+window.toggleCheck = async function(docId, idx) {
+  const run = activeRuns.find(r => r.docId === docId);
+  if (!run) return;
+  const items = [...run.items];
+  items[idx] = { ...items[idx], checked: !items[idx].checked };
+  await updateDoc(docRef('activeRuns', docId), { items });
+};
+
+window.toggleNote = function(docId, idx) {
+  if (!openNotes[docId]) openNotes[docId] = new Set();
+  openNotes[docId].has(idx) ? openNotes[docId].delete(idx) : openNotes[docId].add(idx);
+  renderRun();
+};
+
+window.saveNote = async function(docId, idx, val) {
+  const run = activeRuns.find(r => r.docId === docId);
+  if (!run) return;
+  const items = [...run.items];
+  items[idx] = { ...items[idx], note: val };
+  await updateDoc(docRef('activeRuns', docId), { items });
+};
+
+window.saveRunNote = async function(docId, val) {
+  await updateDoc(docRef('activeRuns', docId), { note: val });
+};
+
+// ── COMPLETE & CANCEL FLOW ────────────────────────────────────────────────────
+function initiateComplete(run) {
+  const unchecked = run.items.filter(i => !i.checked);
+  const modal = document.getElementById('complete-modal');
+  const msg = document.getElementById('complete-modal-msg');
+  const btns = document.getElementById('complete-modal-btns');
+  btns.innerHTML = '';
+
+  if (unchecked.length === 0) {
+    msg.textContent = 'All items checked! Archive this run?';
+    addModalBtn(btns, 'Archive & Finish', 'btn-success', () => completeRun(run, 'archive-all'));
+    addModalBtn(btns, 'Dismiss', 'btn-ghost', closeCMod);
+  } else {
+    msg.textContent = `${unchecked.length} item${unchecked.length > 1 ? 's' : ''} still unchecked. What would you like to do?`;
+    addModalBtn(btns, 'Keep unchecked → new run', 'btn-primary', () => completeRun(run, 'split'));
+    addModalBtn(btns, 'Archive everything as-is', 'btn-ghost', () => completeRun(run, 'archive-all'));
+    addModalBtn(btns, 'Dismiss', 'btn-ghost', closeCMod);
+  }
+  modal.classList.add('open');
+}
+
+function initiateCancel(run) {
+  const modal = document.getElementById('complete-modal');
+  const msg = document.getElementById('complete-modal-msg');
+  const btns = document.getElementById('complete-modal-btns');
+  msg.innerHTML = `Cancel this run? It will be archived with a cancellation note.<br><br>
+    <textarea id="cancel-reason" placeholder="Reason for cancelling (optional)…"
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);
+             border-radius:10px;padding:10px;font-family:inherit;font-size:.88rem;resize:vertical;min-height:70px"></textarea>`;
+  btns.innerHTML = '';
+  addModalBtn(btns, 'Cancel Run & Archive', 'btn-danger', () => cancelRun(run));
+  addModalBtn(btns, 'Dismiss', 'btn-ghost', closeCMod);
+  modal.classList.add('open');
+}
+
+function addModalBtn(container, label, cls, fn) {
+  const b = document.createElement('button');
+  b.className = 'btn ' + cls + ' btn-full';
+  b.textContent = label;
+  b.onclick = fn;
+  container.appendChild(b);
+}
+
+function closeCMod() { document.getElementById('complete-modal').classList.remove('open'); }
+
+async function completeRun(run, mode) {
+  closeCMod();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) +
+    ' ' + now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+
+  await addDoc(colRef('archive'), {
+    items: run.items,
+    note: run.note || '',
+    status: 'completed',
+    completedAt: serverTimestamp(),
+    completedAtStr: dateStr
+  });
+
+  if (mode === 'split') {
+    const unchecked = run.items.filter(i => !i.checked).map(i => ({ ...i, checked: false, note: '' }));
+    await addDoc(colRef('activeRuns'), { items: unchecked, createdAt: serverTimestamp(), note: '', label: '' });
+    showToast('Archived! New run started with remaining items.');
+  } else {
+    showToast('Run completed & archived!');
+  }
+  await deleteDoc(docRef('activeRuns', run.docId));
+  if (activeRuns.length <= 1) switchTab('archive');
+}
+
+async function cancelRun(run) {
+  const reason = (document.getElementById('cancel-reason')?.value || '').trim();
+  closeCMod();
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) +
+    ' ' + now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+
+  await addDoc(colRef('archive'), {
+    items: run.items,
+    note: run.note || '',
+    cancelReason: reason,
+    status: 'cancelled',
+    completedAt: serverTimestamp(),
+    completedAtStr: dateStr
+  });
+  await deleteDoc(docRef('activeRuns', run.docId));
+  showToast('Run cancelled & archived.');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ARCHIVE
+// ════════════════════════════════════════════════════════════════════════════
+onSnapshot(query(colRef('archive'), orderBy('completedAt', 'desc')), snap => {
+  const archives = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderArchive(archives);
+});
+
+function renderArchive(archives) {
+  const el = document.getElementById('archive-list');
+  if (archives.length === 0) {
+    el.innerHTML = `<div class="empty">No completed runs yet.</div>`;
+    return;
+  }
+  el.innerHTML = '';
+  archives.forEach(arc => {
+    const done = arc.items.filter(i => i.checked).length;
+    const cancelled = arc.status === 'cancelled';
+    const div = document.createElement('div');
+    div.className = 'archive-card';
+    div.innerHTML = `
+      <div class="arc-header">
+        <span class="arc-name">${cancelled ? '✕ Cancelled' : '✓ Completed'} — ${arc.completedAtStr || '—'}</span>
+        <span class="badge ${cancelled ? '' : 'green'}">${done}/${arc.items.length}</span>
+      </div>
+      <div class="arc-items">${arc.items.slice(0,4).map(i => i.name).join(', ')}${arc.items.length > 4 ? '…' : ''}</div>
+      ${cancelled && arc.cancelReason ? `<div style="font-size:.78rem;color:var(--red);margin-top:4px">Reason: ${esc(arc.cancelReason)}</div>` : ''}
+      ${arc.note ? `<div style="font-size:.78rem;color:var(--muted);margin-top:4px">📝 ${esc(arc.note)}</div>` : ''}
+      <div class="archive-detail" id="arc-detail-${arc.id}">
+        ${arc.items.map(i => `
+          <div class="arc-item-row">
+            <div class="dot ${i.checked ? 'dot-done' : 'dot-skip'}"></div>
+            <span style="${i.checked ? '' : 'color:var(--muted)'}">${esc(i.name)}</span>
+            ${i.note ? `<span style="font-size:.75rem;color:var(--muted)">— ${esc(i.note)}</span>` : ''}
+          </div>`).join('')}
+        ${arc.note ? `<div style="margin-top:8px;padding:8px;background:var(--surface2);border-radius:8px;font-size:.82rem;color:var(--muted)">📝 ${esc(arc.note)}</div>` : ''}
+        ${cancelled && arc.cancelReason ? `<div style="margin-top:8px;padding:8px;background:rgba(247,90,90,.1);border-radius:8px;font-size:.82rem;color:var(--red)">Cancelled: ${esc(arc.cancelReason)}</div>` : ''}
+      </div>
+    `;
+    div.onclick = () => {
+      const detail = document.getElementById('arc-detail-' + arc.id);
+      detail.classList.toggle('open');
+    };
+    el.appendChild(div);
+  });
+}
+
+// ── BOARD MODAL ───────────────────────────────────────────────────────────────
+window.openBoardModal = async function(required = false) {
+  const listEl = document.getElementById('board-list-items');
+  listEl.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:8px 0">Loading boards…</div>';
+  document.getElementById('board-switch-input').value = '';
+  const modal = document.getElementById('board-modal');
+  modal.classList.add('open');
+  modal.querySelector('.btn-ghost').style.display = required ? 'none' : '';
+
+  // Load all boards from Firestore (no orderBy to avoid index requirement)
+  let firestoreBoards = [];
+  try {
+    const snap = await getDocs(collection(db, 'boardDirectory'));
+    firestoreBoards = snap.docs.map(d => d.data().name).filter(Boolean);
+  } catch(e) { console.warn('boardDirectory load failed', e); }
+
+  // Merge with locally known boards
+  const local = getKnownBoards();
+  const all = [...new Set([...firestoreBoards, ...local])].sort((a,b) => a.localeCompare(b));
+
+  listEl.innerHTML = '';
+  if (all.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:8px 0">No boards yet — create one below.</div>';
+  }
+  all.forEach(name => {
+    const div = document.createElement('div');
+    div.className = 'board-list-item' + (name === BOARD ? ' active-board' : '');
+    div.innerHTML = `
+      <span class="board-name">${esc(name)}</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${name === BOARD ? '<span class="board-check">✓</span>' : ''}
+        <span style="color:var(--red);font-size:.8rem;cursor:pointer;padding:2px 6px" onclick="deleteBoard(event,'${esc(name)}')">✕</span>
+      </div>`;
+    div.onclick = () => {
+      if (name !== BOARD) { addKnownBoard(name); saveBoardName(name); location.reload(); }
+      else { closeBoardModal(); }
+    };
+    listEl.appendChild(div);
+  });
+};
+window.closeBoardModal = function() {
+  document.getElementById('board-modal').classList.remove('open');
+};
+window.deleteBoard = async function(e, name) {
+  e.stopPropagation();
+  if (!confirm(`Delete board "${name}"? This won't delete its data, just remove it from the list.`)) return;
+  // Remove from Firestore directory
+  await deleteDoc(doc(db, 'boardDirectory', slugify(name)));
+  // Remove from local list
+  const boards = getKnownBoards().filter(b => b !== name);
+  localStorage.setItem('knownBoards', JSON.stringify(boards));
+  // If deleting current board, clear it
+  if (name === BOARD) { localStorage.removeItem('boardName'); history.replaceState({}, '', location.pathname); }
+  openBoardModal(name === BOARD);
+};
+window.createBoard = async function() {
+  const inp = document.getElementById('board-switch-input').value.trim();
+  if (!inp || inp.length < 2) { showToast('Enter a board name (2+ characters)'); return; }
+  // Register board in Firestore so all users see it
+  await setDoc(doc(db, 'boardDirectory', slugify(inp)), { name: inp, createdAt: serverTimestamp() });
+  addKnownBoard(inp);
+  saveBoardName(inp);
+  location.reload();
+};
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+</script>
+</body>
+</html>

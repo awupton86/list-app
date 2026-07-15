@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>Home · Upton ∞ +1</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #1e1e1e;
+      --border: #2a2a2a; --text: #e8e8e8; --muted: #666;
+      --accent: #4f8ef7; --radius: 16px;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh; display: flex; flex-direction: column;
+    }
+    nav {
+      padding: 0 20px; height: 64px; display: flex; align-items: center;
+      justify-content: space-between;
+    }
+    .wordmark { display: flex; align-items: center; gap: 7px; }
+    .wordmark .app { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: -.3px; }
+    .wordmark .sep { color: #333; }
+    .wordmark .name { font-size: .95rem; font-weight: 700; letter-spacing: .07em; color: var(--text); }
+    .wordmark .inf { font-size: 1.35rem; color: var(--accent); font-weight: 700; line-height: 1; }
+    .wordmark .plus { color: var(--muted); font-weight: 400; font-size: .9rem; }
+    .wordmark .one { font-weight: 700; color: var(--text); }
+    .date-display { font-size: .78rem; color: var(--muted); text-align: right; line-height: 1.4; }
+
+    main { flex: 1; padding: 8px 16px 32px; display: flex; flex-direction: column; }
+
+    .greeting { font-size: 1.4rem; font-weight: 700; margin-bottom: 4px; }
+    .subgreet { font-size: .85rem; color: var(--muted); margin-bottom: 24px; }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px 16px 18px;
+      display: flex; flex-direction: column; align-items: flex-start;
+      cursor: pointer; text-decoration: none; color: inherit;
+      transition: transform .15s, border-color .15s, background .15s;
+      position: relative; overflow: hidden;
+      min-height: 130px;
+    }
+    .tile:active { transform: scale(.97); }
+    .tile:hover { border-color: #3a3a3a; background: #1f1f1f; }
+    .tile .glow {
+      position: absolute; top: -20px; right: -20px;
+      width: 80px; height: 80px; border-radius: 50%;
+      opacity: .12; filter: blur(20px);
+    }
+    .tile .emoji { font-size: 2.4rem; margin-bottom: 10px; line-height: 1; }
+    .tile .tile-name { font-size: .92rem; font-weight: 700; margin-bottom: 2px; }
+    .tile .tile-sub { font-size: .72rem; color: var(--muted); }
+    .tile .badge {
+      position: absolute; top: 14px; right: 14px;
+      background: var(--accent); color: #fff;
+      font-size: .65rem; font-weight: 700;
+      border-radius: 10px; padding: 2px 7px;
+    }
+
+    .tile-groceries .glow { background: #3ecf6a; }
+    .tile-meals    .glow { background: #f97316; }
+    .tile-chores   .glow { background: #4f8ef7; }
+    .tile-appts    .glow { background: #a78bfa; }
+    .tile-budget   .glow { background: #f7c94f; }
+    .tile-lists    .glow { background: #e879a0; }
+
+    .tile-groceries { border-color: #1d3a28; }
+    .tile-meals    { border-color: #3a2010; }
+    .tile-chores   { border-color: #1a2d45; }
+    .tile-appts    { border-color: #2a1f45; }
+    .tile-budget   { border-color: #3a3010; }
+    .tile-lists    { border-color: #3a1020; }
+
+    .wide-tile { grid-column: 1 / -1; min-height: 90px; flex-direction: row; align-items: center; gap: 16px; padding: 18px 20px; }
+    .wide-tile .emoji { margin-bottom: 0; font-size: 2rem; }
+    .wide-tile .tile-info { flex: 1; }
+
+    .section-label { font-size: .7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 20px 0 10px; }
+
+    /* LOGIN */
+    .login-overlay { position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px; }
+    .login-box { background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:32px 28px;width:100%;max-width:360px; }
+    .login-logo { text-align:center;margin-bottom:24px; }
+    .login-logo .big-inf { font-size:3rem;color:var(--accent);line-height:1; }
+    .login-logo .login-title { font-size:1.2rem;font-weight:700;margin-top:6px; }
+    .login-logo .login-sub { font-size:.8rem;color:var(--muted);margin-top:2px; }
+    .login-label { font-size:.78rem;color:var(--muted);margin-bottom:5px;display:block; }
+    .login-input { width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:11px 14px;font-size:.95rem;font-family:inherit;outline:none;margin-bottom:12px;transition:border-color .15s; }
+    .login-input:focus { border-color:var(--accent); }
+    .login-select { width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:11px 14px;font-size:.95rem;font-family:inherit;outline:none;margin-bottom:12px;appearance:none; }
+    .login-btn { width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px;font-size:.95rem;font-weight:700;cursor:pointer;margin-top:4px; }
+    .login-btn:active { opacity:.85; }
+    .login-err { color:#f75a5a;font-size:.82rem;text-align:center;margin-top:8px;min-height:20px; }
+
+    .user-chip { display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);cursor:pointer; }
+    .user-chip .uname { color:var(--text);font-weight:600; }
+    .user-chip .logout-btn { font-size:.7rem;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:3px 8px;cursor:pointer; }
+    .user-chip .logout-btn:hover { color:var(--red);border-color:var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay" style="display:none">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="big-inf">∞</div>
+      <div class="login-title">Upton Home</div>
+      <div class="login-sub">Sign in to continue</div>
+    </div>
+    <label class="login-label">Family Code</label>
+    <input class="login-input" type="text" id="login-code" placeholder="e.g. upton or smithfamily" autocapitalize="none" autocorrect="off" onkeydown="if(event.key==='Enter')document.getElementById('login-name').focus()" />
+    <label class="login-label">Who are you?</label>
+    <input class="login-input" type="text" id="login-name" placeholder="Your name (Dad, Mom, etc.)" onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()" />
+    <label class="login-label">Family Password</label>
+    <input class="login-input" type="password" id="login-pw" placeholder="Shared family password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div style="font-size:.72rem;color:var(--muted);text-align:center;margin-top:10px">New family? Choose any code &amp; password — your data stays private.</div>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<nav>
+  <div class="wordmark">
+    <span class="app">Home</span>
+    <span class="sep">·</span>
+    <span class="name">UPTON</span>
+    <span class="inf">∞</span>
+    <span class="plus">+</span>
+    <span class="one">1</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="date-display" id="date-display"></div>
+    <div class="user-chip" id="user-chip" style="display:none">
+      <span class="uname" id="user-name-display"></span>
+      <button class="logout-btn" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <div class="greeting" id="greeting">Good morning</div>
+  <div class="subgreet" id="subgreet">What are we managing today?</div>
+
+  <div class="tile-grid">
+    <a class="tile tile-groceries" href="groceries.html">
+      <div class="glow"></div>
+      <div class="emoji">🛒</div>
+      <div class="tile-name">Groceries</div>
+      <div class="tile-sub">Shopping & pantry</div>
+    </a>
+    <a class="tile tile-meals" href="meals.html">
+      <div class="glow"></div>
+      <div class="emoji">🍽️</div>
+      <div class="tile-name">Meal Planning</div>
+      <div class="tile-sub">Weekly meals & ingredients</div>
+    </a>
+    <a class="tile tile-chores" href="chores.html">
+      <div class="glow"></div>
+      <div class="emoji">🧹</div>
+      <div class="tile-name">Chores</div>
+      <div class="tile-sub">Tasks & assignments</div>
+    </a>
+    <a class="tile tile-appts" href="appointments.html">
+      <div class="glow"></div>
+      <div class="emoji">📅</div>
+      <div class="tile-name">Appointments</div>
+      <div class="tile-sub">Schedule & reminders</div>
+    </a>
+    <a class="tile tile-budget wide-tile" href="budget.html">
+      <div class="glow"></div>
+      <div class="emoji">💰</div>
+      <div class="tile-info">
+        <div class="tile-name">Budget</div>
+        <div class="tile-sub">Income, expenses & tracking</div>
+      </div>
+    </a>
+  </div>
+
+  <div class="section-label">Other</div>
+  <div class="tile-grid">
+    <a class="tile tile-lists wide-tile" href="lists.html">
+      <div class="glow"></div>
+      <div class="emoji">📋</div>
+      <div class="tile-info">
+        <div class="tile-name">Lists & Runs</div>
+        <div class="tile-sub">Quick run lists, archive</div>
+      </div>
+    </a>
+  </div>
+</main>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = { apiKey:"AIzaSyDQhwcgkxst89m4aY2hxLXwaGwP4dDJWaY",authDomain:"list-app-c9d29.firebaseapp.com",projectId:"list-app-c9d29",storageBucket:"list-app-c9d29.firebasestorage.app",messagingSenderId:"31606662627",appId:"1:31606662627:web:0503723562bde9b3962cd6" };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const SESSION_KEY = 'hm_session';
+  const SESSION_DAYS = 7;
+
+  function slugify(s){ return s.toLowerCase().replace(/[^a-z0-9]/g,''); }
+  function getSession(){ try{ return JSON.parse(localStorage.getItem(SESSION_KEY)); }catch(e){ return null; } }
+  function isLoggedIn(){ const s=getSession(); return s && s.user && s.familyCode && Date.now() < s.exp; }
+
+  function setDates(user){
+    const now=new Date(), h=now.getHours();
+    const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+    document.getElementById('greeting').textContent = user ? greet+', '+user+'!' : greet;
+    const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    document.getElementById('date-display').innerHTML=days[now.getDay()]+'<br>'+months[now.getMonth()]+' '+now.getDate()+', '+now.getFullYear();
+  }
+
+  function showHome(user, familyCode){
+    document.getElementById('login-overlay').style.display='none';
+    document.getElementById('user-chip').style.display='flex';
+    document.getElementById('user-name-display').textContent=user+' · '+familyCode;
+    setDates(user);
+  }
+
+  window.doLogin = async function(){
+    const codeRaw = document.getElementById('login-code').value.trim();
+    const name = document.getElementById('login-name').value.trim();
+    const pw = document.getElementById('login-pw').value;
+    const errEl = document.getElementById('login-err');
+    errEl.textContent='';
+    if(!codeRaw){ errEl.textContent='Enter a family code.'; return; }
+    if(!name){ errEl.textContent='Enter your name.'; return; }
+    if(!pw){ errEl.textContent='Enter a password.'; return; }
+    const familyCode = slugify(codeRaw) || codeRaw.toLowerCase();
+    const btn = document.querySelector('.login-btn');
+    btn.textContent='Checking…'; btn.disabled=true;
+    try {
+      const settingsRef = doc(db, 'families', familyCode, 'settings', 'auth');
+      const snap = await getDoc(settingsRef);
+      if(!snap.exists()){
+        // New family — create with this password
+        await setDoc(settingsRef, {password: pw, createdAt: Date.now()});
+      } else {
+        if(snap.data().password !== pw){ errEl.textContent='Wrong password for that family code.'; btn.textContent='Sign In'; btn.disabled=false; return; }
+      }
+      const exp = Date.now() + SESSION_DAYS*24*60*60*1000;
+      localStorage.setItem(SESSION_KEY, JSON.stringify({user:name, familyCode, exp}));
+      showHome(name, familyCode);
+    } catch(e){
+      errEl.textContent='Connection error. Try again.';
+    }
+    btn.textContent='Sign In'; btn.disabled=false;
+  };
+
+  window.doLogout = function(){
+    localStorage.removeItem(SESSION_KEY);
+    location.reload();
+  };
+
+  if(isLoggedIn()){
+    const s=getSession();
+    showHome(s.user, s.familyCode);
+  } else {
+    document.getElementById('login-overlay').style.display='flex';
+    setDates(null);
+  }
+</script>
+</body>
+</html>
