@@ -6,6 +6,9 @@
   <meta name="theme-color" content="#0f0f0f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Home · Upton ∞ +1</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="shared.css" />
+  <script src="shared.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -88,6 +91,19 @@
     .wide-tile .tile-info { flex: 1; }
 
     .section-label { font-size: .7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin: 20px 0 10px; }
+    .today-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;scroll-margin-top:16px; }
+    .today-card { min-height:104px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:14px;text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:5px; }
+    .today-card .today-icon { font-size:1.35rem; }
+    .today-card .today-value { font-size:1.05rem;font-weight:750;line-height:1.25; }
+    .today-card .today-label { color:var(--muted);font-size:.76rem;line-height:1.3; }
+    .today-loading { color:var(--muted);font-size:.8rem; }
+    .family-list { display:flex;flex-direction:column;gap:8px;margin-bottom:12px; }
+    .family-member { display:flex;align-items:center;gap:10px;min-height:48px;background:var(--surface2);border-radius:12px;padding:8px 10px; }
+    .family-member strong { flex:1; }
+    .family-member button { min-width:44px;border:0;background:transparent;color:#f75a5a;font-size:1.1rem; }
+    .feature-picker { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px; }
+    .feature-picker label { min-height:44px;background:var(--surface2);border-radius:12px;padding:10px;display:flex;align-items:center;gap:8px;font-size:.84rem; }
+    .tile-lists, .legacy-heading { display:none !important; }
 
     /* LOGIN */
     .login-overlay { position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px; }
@@ -152,34 +168,44 @@
 
 <main>
   <div class="greeting" id="greeting">Good morning</div>
-  <div class="subgreet" id="subgreet">What are we managing today?</div>
+  <div class="subgreet" id="subgreet">Here’s what your family has going on.</div>
+
+  <div class="section-label" style="margin-top:0">Today</div>
+  <div class="today-grid" id="today">
+    <a class="today-card" data-home-feature="chores" href="chores.html"><span class="today-icon">✅</span><span class="today-value" id="today-chores">—</span><span class="today-label">Chores remaining</span></a>
+    <a class="today-card" data-home-feature="appointments" href="appointments.html"><span class="today-icon">📅</span><span class="today-value" id="today-appt">—</span><span class="today-label" id="today-appt-label">Next appointment</span></a>
+    <a class="today-card" data-home-feature="meals" href="meals.html"><span class="today-icon">🍽️</span><span class="today-value" id="today-meal">—</span><span class="today-label">Dinner tonight</span></a>
+    <a class="today-card" data-home-feature="groceries" href="groceries.html"><span class="today-icon">🛒</span><span class="today-value" id="today-groceries">—</span><span class="today-label">Groceries to get</span></a>
+  </div>
+
+  <div class="section-label">All tools</div>
 
   <div class="tile-grid">
-    <a class="tile tile-groceries" href="groceries.html">
+    <a class="tile tile-groceries" data-home-feature="groceries" href="groceries.html">
       <div class="glow"></div>
       <div class="emoji">🛒</div>
       <div class="tile-name">Groceries</div>
       <div class="tile-sub">Shopping & pantry</div>
     </a>
-    <a class="tile tile-meals" href="meals.html">
+    <a class="tile tile-meals" data-home-feature="meals" href="meals.html">
       <div class="glow"></div>
       <div class="emoji">🍽️</div>
       <div class="tile-name">Meal Planning</div>
       <div class="tile-sub">Weekly meals & ingredients</div>
     </a>
-    <a class="tile tile-chores" href="chores.html">
+    <a class="tile tile-chores" data-home-feature="chores" href="chores.html">
       <div class="glow"></div>
       <div class="emoji">🧹</div>
       <div class="tile-name">Chores</div>
       <div class="tile-sub">Tasks & assignments</div>
     </a>
-    <a class="tile tile-appts" href="appointments.html">
+    <a class="tile tile-appts" data-home-feature="appointments" href="appointments.html">
       <div class="glow"></div>
       <div class="emoji">📅</div>
       <div class="tile-name">Appointments</div>
       <div class="tile-sub">Schedule & reminders</div>
     </a>
-    <a class="tile tile-budget wide-tile" href="budget.html">
+    <a class="tile tile-budget wide-tile" data-home-feature="budget" href="budget.html">
       <div class="glow"></div>
       <div class="emoji">💰</div>
       <div class="tile-info">
@@ -189,7 +215,7 @@
     </a>
   </div>
 
-  <div class="section-label">Other</div>
+  <div class="section-label legacy-heading">Other</div>
   <div class="tile-grid">
     <a class="tile tile-lists wide-tile" href="lists.html">
       <div class="glow"></div>
@@ -202,9 +228,31 @@
   </div>
 </main>
 
+<div class="hm-sheet-backdrop" id="family-settings" role="dialog" aria-modal="true" aria-label="Family settings">
+  <div class="hm-sheet">
+    <div class="hm-sheet-handle"></div>
+    <h3>Family members</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">These names are shared by chores and appointments.</p>
+    <div class="family-list" id="family-member-list"></div>
+    <div style="display:flex;gap:8px">
+      <input class="login-input" id="family-member-input" maxlength="30" placeholder="Add a family member" style="margin:0;flex:1" />
+      <button class="login-btn" onclick="addFamilyMember()" style="width:auto;margin:0;padding:10px 16px">Add</button>
+    </div>
+    <div class="section-label">Show on Home</div>
+    <div class="feature-picker" id="feature-picker">
+      <label><input type="checkbox" value="groceries" onchange="toggleHomeFeature(this)" checked /> Groceries</label>
+      <label><input type="checkbox" value="meals" onchange="toggleHomeFeature(this)" checked /> Meals</label>
+      <label><input type="checkbox" value="chores" onchange="toggleHomeFeature(this)" checked /> Chores</label>
+      <label><input type="checkbox" value="appointments" onchange="toggleHomeFeature(this)" checked /> Appointments</label>
+      <label><input type="checkbox" value="budget" onchange="toggleHomeFeature(this)" checked /> Budget</label>
+    </div>
+    <div class="hm-sheet-footer"><button type="button" onclick="closeFamilySettings()">Done</button></div>
+  </div>
+</div>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getFirestore, collection, doc, addDoc, deleteDoc, getDoc, getDocs, setDoc, onSnapshot, query, orderBy, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = { apiKey:"AIzaSyDQhwcgkxst89m4aY2hxLXwaGwP4dDJWaY",authDomain:"list-app-c9d29.firebaseapp.com",projectId:"list-app-c9d29",storageBucket:"list-app-c9d29.firebasestorage.app",messagingSenderId:"31606662627",appId:"1:31606662627:web:0503723562bde9b3962cd6" };
   const app = initializeApp(firebaseConfig);
@@ -231,7 +279,86 @@
     document.getElementById('user-chip').style.display='flex';
     document.getElementById('user-name-display').textContent=user+' · '+familyCode;
     setDates(user);
+    loadToday(familyCode);
+    watchFamilyMembers(familyCode);
+    ensureCurrentMember(user,familyCode);
   }
+
+  async function ensureCurrentMember(user,familyCode){
+    const snap=await getDocs(collection(db,'families',familyCode,'members'));
+    if(!snap.docs.some(d=>(d.data().name||'').toLowerCase()===user.toLowerCase())) await addDoc(collection(db,'families',familyCode,'members'),{name:user,order:Date.now(),createdAt:serverTimestamp()});
+  }
+
+  function dateStr(d=new Date()){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function isChoreDue(chore, date){
+    if(chore.recurrence==='daily') return true;
+    if(chore.recurrence==='weekly') return (chore.days||[]).includes(new Date(date+'T00:00:00').getDay());
+    return chore.date===date;
+  }
+  async function loadToday(familyCode){
+    const today=dateStr();
+    try{
+      const [shopping,appointments,mealPlan,chores,completions]=await Promise.all([
+        getDocs(collection(db,'families',familyCode,'shoppingList')),
+        getDocs(collection(db,'families',familyCode,'appointments')),
+        getDocs(collection(db,'families',familyCode,'mealPlan')),
+        getDocs(collection(db,'families',familyCode,'choreDefinitions')),
+        getDocs(query(collection(db,'families',familyCode,'choreCompletions'),where('date','==',today)))
+      ]);
+      const groceryCount=shopping.docs.filter(d=>!d.data().checked).length;
+      document.getElementById('today-groceries').textContent=groceryCount ? groceryCount+' item'+(groceryCount===1?'':'s') : 'All set';
+      const upcoming=appointments.docs.map(d=>d.data()).filter(a=>a.date>=today).sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||''));
+      const next=upcoming[0];
+      document.getElementById('today-appt').textContent=next ? next.title : 'Nothing scheduled';
+      document.getElementById('today-appt-label').textContent=next ? (next.date===today?'Today':'Next: '+next.date) : 'Next appointment';
+      const dinner=mealPlan.docs.map(d=>({id:d.id,...d.data()})).find(m=>m.id===today+'_Dinner');
+      document.getElementById('today-meal').textContent=dinner?.mealName||'Not planned';
+      const due=chores.docs.map(d=>({id:d.id,...d.data()})).filter(c=>isChoreDue(c,today));
+      const done=new Set(completions.docs.filter(d=>d.data().date===today).map(d=>d.id));
+      const remaining=due.filter(c=>!done.has(c.id+'_'+today)).length;
+      document.getElementById('today-chores').textContent=remaining ? remaining+' left' : 'All done';
+    }catch(e){
+      document.querySelectorAll('.today-value').forEach(el=>el.textContent='Tap to view');
+      window.hmStatus?.('Could not refresh Today',true);
+    }
+  }
+
+  let stopMembers=null;
+  function watchFamilyMembers(familyCode){
+    if(stopMembers) stopMembers();
+    stopMembers=onSnapshot(query(collection(db,'families',familyCode,'members'),orderBy('order')),snap=>{
+      const list=document.getElementById('family-member-list');
+      list.innerHTML=snap.empty?'<div class="today-loading">No family members yet.</div>':'';
+      snap.docs.forEach(member=>{
+        const row=document.createElement('div'); row.className='family-member';
+        const name=document.createElement('strong'); name.textContent=member.data().name;
+        const del=document.createElement('button'); del.type='button'; del.textContent='×'; del.setAttribute('aria-label','Remove '+member.data().name);
+        del.onclick=()=>removeFamilyMember(member.id,member.data().name);
+        row.append(name,del); list.appendChild(row);
+      });
+    });
+  }
+  window.addFamilyMember=async function(){
+    const input=document.getElementById('family-member-input'),name=input.value.trim(),s=getSession(); if(!name||!s)return;
+    await addDoc(collection(db,'families',s.familyCode,'members'),{name,order:Date.now(),createdAt:serverTimestamp()}); input.value=''; window.hmStatus?.('Family member added');
+  };
+  window.removeFamilyMember=async function(id,name){
+    if(!confirm('Remove '+name+' from family members?'))return; const s=getSession();
+    await deleteDoc(doc(db,'families',s.familyCode,'members',id)); window.hmStatus?.('Family member removed');
+  };
+  window.closeFamilySettings=function(){ document.getElementById('family-settings').classList.remove('open'); history.replaceState({},'',location.pathname); };
+  function applyFeaturePrefs(){
+    let hidden=[]; try{hidden=JSON.parse(localStorage.getItem('hm_hidden_features')||'[]');}catch(e){}
+    document.querySelectorAll('[data-home-feature]').forEach(el=>el.style.display=hidden.includes(el.dataset.homeFeature)?'none':'flex');
+    document.querySelectorAll('#feature-picker input').forEach(input=>input.checked=!hidden.includes(input.value));
+  }
+  window.toggleHomeFeature=function(input){
+    let hidden=[]; try{hidden=JSON.parse(localStorage.getItem('hm_hidden_features')||'[]');}catch(e){}
+    hidden=input.checked?hidden.filter(x=>x!==input.value):[...new Set([...hidden,input.value])]; localStorage.setItem('hm_hidden_features',JSON.stringify(hidden)); applyFeaturePrefs();
+  };
+  function openHashPanel(){ if(location.hash==='#family-settings') document.getElementById('family-settings').classList.add('open'); applyFeaturePrefs(); }
+  addEventListener('hashchange',openHashPanel); addEventListener('DOMContentLoaded',openHashPanel);
+  openHashPanel();
 
   window.doLogin = async function(){
     const codeRaw = document.getElementById('login-code').value.trim();
@@ -248,6 +375,7 @@
     try {
       const settingsRef = doc(db, 'families', familyCode, 'settings', 'auth');
       const snap = await getDoc(settingsRef);
+      const isNewFamily=!snap.exists();
       if(!snap.exists()){
         // New family — create with this password
         await setDoc(settingsRef, {password: pw, createdAt: Date.now()});
@@ -256,7 +384,11 @@
       }
       const exp = Date.now() + SESSION_DAYS*24*60*60*1000;
       localStorage.setItem(SESSION_KEY, JSON.stringify({user:name, familyCode, exp}));
-      showHome(name, familyCode);
+      const memberSnap=await getDocs(collection(db,'families',familyCode,'members'));
+      if(!memberSnap.docs.some(d=>(d.data().name||'').toLowerCase()===name.toLowerCase())){
+        await addDoc(collection(db,'families',familyCode,'members'),{name,order:Date.now(),createdAt:serverTimestamp()});
+      }
+      if(isNewFamily) location.href='index.html#family-settings'; else location.reload();
     } catch(e){
       errEl.textContent='Connection error. Try again.';
     }

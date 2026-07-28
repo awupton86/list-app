@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f0f0f" />
   <title>Appointments · Upton ∞ +1</title>
+  <link rel="stylesheet" href="shared.css" />
+  <script src="shared.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root { --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;--text:#e8e8e8;--muted:#888;--accent:#a78bfa;--green:#3ecf6a;--red:#f75a5a;--radius:14px; }
@@ -115,6 +117,14 @@
       <div class="person-chips" id="person-chips"></div>
     </div>
     <div class="form-group">
+      <label class="form-label">Repeat</label>
+      <select id="appt-repeat"><option value="none">Does not repeat</option><option value="weekly">Every week</option><option value="monthly">Every month</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Calendar reminder</label>
+      <select id="appt-reminder"><option value="0">No reminder</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select>
+    </div>
+    <div class="form-group">
       <label class="form-label">Color</label>
       <div class="color-picker" id="color-picker"></div>
     </div>
@@ -122,7 +132,7 @@
       <label class="form-label">Notes (optional)</label>
       <textarea id="appt-notes" placeholder="Location, address, what to bring…"></textarea>
     </div>
-    <button class="btn btn-primary btn-full" onclick="saveAppt()">Save Appointment</button>
+    <button class="btn btn-primary btn-full" id="save-appt-btn" onclick="saveAppt()">Save Appointment</button>
     <button class="btn btn-ghost btn-full" onclick="clearForm()">Clear</button>
   </div>
 </main>
@@ -130,7 +140,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore,collection,doc,addDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp,getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore,collection,doc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp,getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = { apiKey:"AIzaSyDQhwcgkxst89m4aY2hxLXwaGwP4dDJWaY",authDomain:"list-app-c9d29.firebaseapp.com",projectId:"list-app-c9d29",storageBucket:"list-app-c9d29.firebasestorage.app",messagingSenderId:"31606662627",appId:"1:31606662627:web:0503723562bde9b3962cd6" };
 const app = initializeApp(firebaseConfig);
@@ -141,13 +151,17 @@ const MONTHS=['January','February','March','April','May','June','July','August',
 const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS_S=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const COLORS=['#a78bfa','#4f8ef7','#3ecf6a','#f97316','#f7c94f','#e879a0','#f75a5a','#4fc4cf'];
-const PEOPLE=['Dad','Mom','Walker','Karsen','Alana','All'];
+let PEOPLE=['All'];
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
-let appointments=[], calOffset=0, selectedColor=COLORS[0], selectedPeople=[], selectedCalDay=null, currentTab='upcoming';
+let appointments=[], calOffset=0, selectedColor=COLORS[0], selectedPeople=[], selectedCalDay=null, currentTab='upcoming', editingApptId=null;
+
+onSnapshot(query(collection(db,'families',FC,'members'),orderBy('order')),snap=>{
+  PEOPLE=[...snap.docs.map(d=>d.data().name).filter(Boolean),'All']; renderPersonChips();
+});
 
 onSnapshot(query(collection(db,'families',FC,'appointments'),orderBy('date')), snap=>{
   appointments=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -204,6 +218,7 @@ function apptCard(a,past=false){
       ${a.notes?`<div class="appt-notes">${esc(a.notes)}</div>`:''}
       <div class="appt-actions">
         <a class="ics-btn" href="${makeICS(a)}" download="${esc(a.title.replace(/\s+/g,'-'))}.ics">📆 Add to Calendar</a>
+        <span class="ics-btn" onclick="editAppt('${a.id}')">Edit</span>
         <span class="del-appt" onclick="deleteAppt('${a.id}')">Delete</span>
       </div>
     </div>`;
@@ -217,11 +232,19 @@ function makeICS(a){
   const start=a.time ? dt+'T'+a.time.replace(':','')+':00' : dt;
   const end=a.time ? dt+'T'+(String(parseInt(a.time.split(':')[0])+1).padStart(2,'0'))+a.time.slice(2)+'00' : dt;
   const allDay=!a.time;
-  const ics=`BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${a.title}\n${allDay?'DTSTART;VALUE=DATE:'+start+'\nDTEND;VALUE=DATE:'+end:'DTSTART:'+start+'\nDTEND:'+end}\nDESCRIPTION:${a.notes||''}\nEND:VEVENT\nEND:VCALENDAR`;
+  const alarm=a.reminderMinutes?`\nBEGIN:VALARM\nTRIGGER:-PT${a.reminderMinutes}M\nACTION:DISPLAY\nDESCRIPTION:${a.title}\nEND:VALARM`:'';
+  const ics=`BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${a.title}\n${allDay?'DTSTART;VALUE=DATE:'+start+'\nDTEND;VALUE=DATE:'+end:'DTSTART:'+start+'\nDTEND:'+end}\nDESCRIPTION:${a.notes||''}${alarm}\nEND:VEVENT\nEND:VCALENDAR`;
   return 'data:text/calendar;charset=utf8,'+encodeURIComponent(ics);
 }
 
 window.deleteAppt=async function(id){ if(!confirm('Delete this appointment?')) return; await deleteDoc(doc(db,'families',FC,'appointments',id)); showToast('Deleted'); };
+window.editAppt=function(id){
+  const a=appointments.find(x=>x.id===id); if(!a)return; editingApptId=id;
+  document.getElementById('appt-title').value=a.title||''; document.getElementById('appt-date').value=a.date||'';
+  document.getElementById('appt-time').value=a.time||''; document.getElementById('appt-notes').value=a.notes||'';
+  document.getElementById('appt-repeat').value='none'; document.getElementById('appt-reminder').value=String(a.reminderMinutes||0); selectedPeople=[...(a.people||[])]; selectedColor=a.color||COLORS[0];
+  document.getElementById('save-appt-btn').textContent='Update Appointment'; renderColorPicker(); renderPersonChips(); switchTab('add');
+};
 
 // CALENDAR
 window.changeMonth=function(dir){ calOffset+=dir; renderCalendar(); };
@@ -277,18 +300,31 @@ window.saveAppt=async function(){
   const date=document.getElementById('appt-date').value;
   if(!title){ showToast('Enter a title'); return; }
   if(!date){ showToast('Pick a date'); return; }
-  await addDoc(collection(db,'families',FC,'appointments'),{title,date,time:document.getElementById('appt-time').value||'',notes:document.getElementById('appt-notes').value.trim(),people:selectedPeople,color:selectedColor,createdAt:serverTimestamp()});
-  showToast('Appointment saved!'); clearForm(); switchTab('upcoming');
+  const repeat=document.getElementById('appt-repeat').value;
+  const data={title,date,time:document.getElementById('appt-time').value||'',notes:document.getElementById('appt-notes').value.trim(),people:selectedPeople,color:selectedColor,reminderMinutes:parseInt(document.getElementById('appt-reminder').value)||0,updatedAt:serverTimestamp()};
+  if(editingApptId){ await updateDoc(doc(db,'families',FC,'appointments',editingApptId),data); }
+  else {
+    await addDoc(collection(db,'families',FC,'appointments'),{...data,createdAt:serverTimestamp()});
+    if(repeat!=='none'){
+      const start=new Date(date+'T00:00:00');
+      for(let i=1;i<12;i++){ const next=new Date(start); repeat==='weekly'?next.setDate(next.getDate()+7*i):next.setMonth(next.getMonth()+i); await addDoc(collection(db,'families',FC,'appointments'),{...data,date:todayStrFrom(next),series:repeat,createdAt:serverTimestamp()}); }
+    }
+  }
+  showToast(editingApptId?'Appointment updated!':'Appointment saved!'); clearForm(); switchTab('upcoming');
 };
+
+function todayStrFrom(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 
 window.clearForm=function(){
   document.getElementById('appt-title').value='';
   document.getElementById('appt-time').value='';
   document.getElementById('appt-notes').value='';
+  document.getElementById('appt-repeat').value='none'; document.getElementById('appt-reminder').value='0'; editingApptId=null; document.getElementById('save-appt-btn').textContent='Save Appointment';
   selectedPeople=[]; selectedColor=COLORS[0];
   initForm();
 };
 initForm();
+if(new URLSearchParams(location.search).get('action')==='add') setTimeout(()=>switchTab('add'),0);
 </script>
 </body>
 </html>

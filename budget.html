@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f0f0f" />
   <title>Budget · Upton ∞ +1</title>
+  <link rel="stylesheet" href="shared.css" />
+  <script src="shared.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root { --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;--text:#e8e8e8;--muted:#888;--accent:#f7c94f;--green:#3ecf6a;--red:#f75a5a;--radius:14px; }
@@ -55,6 +57,7 @@
     .cat-bar-wrap { flex:1;background:var(--surface2);border-radius:4px;height:6px;overflow:hidden; }
     .cat-bar-fill { height:100%;border-radius:4px;background:var(--red); }
     .cat-bar-amt { font-size:.8rem;color:var(--muted);min-width:60px;text-align:right; }
+    .cat-limit-btn { min-width:58px;min-height:40px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--muted);font-size:.72rem;padding:4px 7px; }
 
     .form-group { margin-bottom:14px; }
     .form-label { font-size:.78rem;color:var(--muted);margin-bottom:6px;display:block; }
@@ -115,14 +118,19 @@
       <label class="form-label">Date</label>
       <input type="date" id="tx-date" />
     </div>
-    <button class="btn btn-primary btn-full" onclick="saveTransaction()">Save</button>
+    <div class="form-group">
+      <label class="form-label">Repeat</label>
+      <select id="tx-repeat"><option value="none">One time</option><option value="monthly">Every month</option></select>
+    </div>
+    <button class="btn btn-primary btn-full" id="save-tx-btn" onclick="saveTransaction()">Save</button>
+    <button class="btn btn-ghost btn-full" id="cancel-tx-btn" style="display:none" onclick="clearTransactionForm()">Cancel edit</button>
   </div>
 </main>
 <div class="toast" id="toast"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore,collection,doc,addDoc,deleteDoc,onSnapshot,query,orderBy,where,serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore,collection,doc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,where,serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = { apiKey:"AIzaSyDQhwcgkxst89m4aY2hxLXwaGwP4dDJWaY",authDomain:"list-app-c9d29.firebaseapp.com",projectId:"list-app-c9d29",storageBucket:"list-app-c9d29.firebasestorage.app",messagingSenderId:"31606662627",appId:"1:31606662627:web:0503723562bde9b3962cd6" };
 const app = initializeApp(firebaseConfig);
@@ -138,8 +146,10 @@ const INCOME_CATS=[{emoji:'💼',label:'Paycheck'},{emoji:'💹',label:'Investme
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showToast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
 function fmt(n){ return '$'+Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,','); }
+function getBudgetLimits(){ try{return JSON.parse(localStorage.getItem('hm_budget_limits_'+FC)||'{}');}catch(e){return {};} }
+window.setBudgetLimit=function(category){ const current=getBudgetLimits(),value=prompt('Monthly limit for '+category+' (leave blank to remove)',current[category]||''); if(value===null)return; const amount=parseFloat(value); if(amount>0)current[category]=amount;else delete current[category]; localStorage.setItem('hm_budget_limits_'+FC,JSON.stringify(current)); renderOverview(); };
 
-let transactions=[], monthOffset=0, selectedType='expense', currentTab='overview';
+let transactions=[], monthOffset=0, selectedType='expense', currentTab='overview', editingTxId=null;
 
 function getMonthRange(){
   const now=new Date(); now.setDate(1); now.setMonth(now.getMonth()+monthOffset);
@@ -200,12 +210,14 @@ function renderOverview(){
     expenseTxs.forEach(t=>{ catTotals[t.category]=(catTotals[t.category]||0)+t.amount; });
     const sorted=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
     const maxAmt=sorted[0]?.[1]||1;
+    const limits=getBudgetLimits();
     const head=document.createElement('div'); head.className='section-head'; head.textContent='By Category'; el.appendChild(head);
     const card=document.createElement('div'); card.className='card';
     sorted.forEach(([cat,amt])=>{
       const info=EXPENSE_CATS.find(c=>c.label===cat)||{emoji:'💳',label:cat};
       const row=document.createElement('div'); row.className='cat-bar-row';
-      row.innerHTML=`<span class="cat-bar-label">${esc(info.emoji)} ${esc(cat)}</span><div class="cat-bar-wrap"><div class="cat-bar-fill" style="width:${Math.round(amt/maxAmt*100)}%"></div></div><span class="cat-bar-amt">${fmt(amt)}</span>`;
+      const limit=limits[cat],barMax=limit||maxAmt,barPct=Math.min(100,Math.round(amt/barMax*100));
+      row.innerHTML=`<span class="cat-bar-label">${esc(info.emoji)} ${esc(cat)}</span><div class="cat-bar-wrap"><div class="cat-bar-fill" style="width:${barPct}%;background:${limit&&amt>limit?'var(--red)':'var(--accent)'}"></div></div><span class="cat-bar-amt">${fmt(amt)}</span><button class="cat-limit-btn" onclick="setBudgetLimit('${esc(cat)}')">${limit?fmt(limit):'Set limit'}</button>`;
       card.appendChild(row);
     });
     el.appendChild(card);
@@ -238,11 +250,22 @@ function txRow(t){
       <div class="tx-cat">${esc(t.category)} · ${esc(t.date)}</div>
     </div>
     <div class="tx-amount ${t.type}">${t.type==='income'?'+':'-'}${fmt(t.amount)}</div>
+    <span class="del-tx" onclick="editTx('${t.id}')">Edit</span>
     <span class="del-tx" onclick="deleteTx('${t.id}')">✕</span>`;
   return row;
 }
 
 window.deleteTx=async function(id){ if(!confirm('Delete this transaction?')) return; await deleteDoc(doc(db,'families',FC,'budgetTransactions',id)); showToast('Deleted'); };
+window.editTx=function(id){
+  const t=transactions.find(x=>x.id===id); if(!t)return; editingTxId=id; setType(t.type);
+  document.getElementById('tx-desc').value=t.description||''; document.getElementById('tx-amount').value=t.amount||'';
+  document.getElementById('tx-date').value=t.date||''; document.getElementById('tx-cat').value=t.category||''; document.getElementById('tx-repeat').value='none';
+  document.getElementById('save-tx-btn').textContent='Update'; document.getElementById('cancel-tx-btn').style.display='flex'; switchTab('add');
+};
+window.clearTransactionForm=function(){
+  editingTxId=null; document.getElementById('tx-desc').value=''; document.getElementById('tx-amount').value=''; document.getElementById('tx-repeat').value='none';
+  document.getElementById('save-tx-btn').textContent='Save'; document.getElementById('cancel-tx-btn').style.display='none'; initForm();
+};
 
 function initForm(){
   const today=new Date(); document.getElementById('tx-date').value=today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
@@ -266,15 +289,24 @@ window.saveTransaction=async function(){
   const amount=parseFloat(document.getElementById('tx-amount').value);
   const cat=document.getElementById('tx-cat').value;
   const date=document.getElementById('tx-date').value;
+  const repeat=document.getElementById('tx-repeat').value;
   if(!desc){ showToast('Enter a description'); return; }
   if(!amount||amount<=0){ showToast('Enter a valid amount'); return; }
   if(!date){ showToast('Pick a date'); return; }
-  await addDoc(collection(db,'families',FC,'budgetTransactions'),{description:desc,amount,category:cat,type:selectedType,date,createdAt:serverTimestamp()});
-  document.getElementById('tx-desc').value=''; document.getElementById('tx-amount').value='';
-  showToast('Saved!'); switchTab('overview');
+  const data={description:desc,amount,category:cat,type:selectedType,date,updatedAt:serverTimestamp()};
+  if(editingTxId) await updateDoc(doc(db,'families',FC,'budgetTransactions',editingTxId),data);
+  else {
+    await addDoc(collection(db,'families',FC,'budgetTransactions'),{...data,createdAt:serverTimestamp()});
+    if(repeat==='monthly'){
+      const start=new Date(date+'T00:00:00');
+      for(let i=1;i<12;i++){ const next=new Date(start); next.setMonth(next.getMonth()+i); const nextDate=next.getFullYear()+'-'+String(next.getMonth()+1).padStart(2,'0')+'-'+String(next.getDate()).padStart(2,'0'); await addDoc(collection(db,'families',FC,'budgetTransactions'),{...data,date:nextDate,series:'monthly',createdAt:serverTimestamp()}); }
+    }
+  }
+  const wasEditing=!!editingTxId; clearTransactionForm(); showToast(wasEditing?'Updated!':'Saved!'); switchTab('overview');
 };
 
 initForm();
+if(new URLSearchParams(location.search).get('action')==='add') setTimeout(()=>switchTab('add'),0);
 </script>
 </body>
 </html>

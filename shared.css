@@ -1,0 +1,81 @@
+:root { color-scheme: dark; }
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f7fb !important;
+  --surface: #ffffff !important;
+  --surface2: #eef1f6 !important;
+  --border: #dfe3ea !important;
+  --text: #18202b !important;
+  --muted: #657080 !important;
+}
+
+body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, [role="button"], .tab, .back, .back-link, .week-btn, .month-btn,
+.cal-btn, .del-btn, .del-item, .del-tx, .del-appt, .notes-toggle,
+.loc-edit-btn, .panel-close { min-height: 44px; }
+.cb, .qty-btn, .add-btn, .del-btn, .del-item, .del-tx, .del-appt, .panel-close { min-width: 44px; }
+input, select, textarea { font-size: 16px !important; min-height: 46px; }
+
+.hm-bottom-nav {
+  position: fixed; z-index: 180; left: 0; right: 0; bottom: 0;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding: 6px 8px env(safe-area-inset-bottom);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-top: 1px solid var(--border); backdrop-filter: blur(16px);
+}
+.hm-bottom-nav a, .hm-bottom-nav button {
+  border: 0; background: transparent; color: var(--muted); text-decoration: none;
+  min-width: 0; min-height: 52px; border-radius: 12px; display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font: 600 .67rem/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.hm-bottom-nav .hm-icon { font-size: 1.28rem; line-height: 1.1; }
+.hm-bottom-nav .active { color: var(--accent, #4f8ef7); background: color-mix(in srgb, var(--accent, #4f8ef7) 12%, transparent); }
+
+.hm-fab {
+  position: fixed; z-index: 181; right: 18px; bottom: calc(78px + env(safe-area-inset-bottom));
+  width: 54px; height: 54px; min-height: 54px; border-radius: 50%; border: 0;
+  background: var(--accent, #4f8ef7); color: #fff; font-size: 1.8rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35); cursor: pointer;
+}
+.hm-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 400; display: none; align-items: flex-end;
+  background: rgba(0,0,0,.62);
+}
+.hm-sheet-backdrop.open { display: flex; }
+.hm-sheet {
+  width: 100%; max-width: 640px; margin: 0 auto; padding: 12px 18px calc(22px + env(safe-area-inset-bottom));
+  background: var(--surface); border-radius: 22px 22px 0 0; color: var(--text);
+}
+.hm-sheet-handle { width: 42px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 16px; }
+.hm-sheet h3 { font-size: 1.05rem; margin: 0 0 12px; }
+.hm-action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.hm-action {
+  min-height: 62px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface2); color: var(--text); text-decoration: none; display: flex;
+  align-items: center; gap: 10px; font-size: .9rem; font-weight: 650;
+}
+.hm-action span { font-size: 1.35rem; }
+.hm-sheet-footer { display: flex; gap: 10px; margin-top: 12px; }
+.hm-sheet-footer button, .hm-sheet-footer a {
+  flex: 1; min-height: 46px; padding: 10px; border: 1px solid var(--border); border-radius: 12px;
+  background: transparent; color: var(--text); text-align: center; text-decoration: none; font: 600 .84rem/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+.hm-sync {
+  position: fixed; left: 12px; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 170;
+  padding: 6px 10px; border-radius: 16px; background: var(--surface2); color: var(--muted);
+  border: 1px solid var(--border); font-size: .72rem; opacity: 0; transform: translateY(8px);
+  transition: .2s; pointer-events: none;
+}
+.hm-sync.show { opacity: 1; transform: none; }
+.hm-sync.error { color: #f75a5a; }
+
+@media (min-width: 760px) {
+  body { padding-bottom: 0; }
+  .hm-bottom-nav { left: 50%; right: auto; width: 520px; transform: translateX(-50%); border: 1px solid var(--border); border-bottom: 0; border-radius: 18px 18px 0 0; }
+  .hm-fab { right: calc(50% - 300px); }
+}

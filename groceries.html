@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0f0f0f" />
   <title>Groceries · Upton ∞ +1</title>
+  <link rel="stylesheet" href="shared.css" />
+  <script src="shared.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root { --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#242424;--border:#2e2e2e;--text:#e8e8e8;--muted:#888;--accent:#4f8ef7;--green:#3ecf6a;--red:#f75a5a;--radius:14px; }
@@ -94,6 +96,10 @@
     .input-row { display:flex;gap:8px;margin-bottom:12px; }
     input[type=text] { background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:10px 14px;font-size:.9rem;font-family:inherit;outline:none;flex:1; }
     input[type=text]:focus { border-color:var(--accent); }
+    .quick-grocery { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:12px;margin-bottom:14px; }
+    .quick-grocery-row { display:flex;gap:8px; }
+    .recent-items { display:flex;gap:7px;overflow-x:auto;padding-top:9px;scrollbar-width:none; }
+    .recent-chip { flex:0 0 auto;min-height:36px;border:1px solid var(--border);border-radius:18px;background:var(--surface2);color:var(--text);padding:7px 12px;font-size:.78rem; }
   </style>
 </head>
 <body>
@@ -111,6 +117,14 @@
 <main>
   <!-- SHOP -->
   <div class="page active" id="page-shop">
+    <div class="quick-grocery">
+      <div class="quick-grocery-row">
+        <input type="text" id="quick-grocery-input" list="grocery-suggestions" placeholder="Add milk, bananas, paper towels…" onkeydown="if(event.key==='Enter')quickAddGrocery()" />
+        <button class="btn btn-primary" onclick="quickAddGrocery()">Add</button>
+      </div>
+      <datalist id="grocery-suggestions"></datalist>
+      <div class="recent-items" id="recent-groceries"></div>
+    </div>
     <div id="items-panel" class="items-panel">
       <div class="panel-header">
         <h3 id="panel-title">Items</h3>
@@ -180,6 +194,9 @@ const CATS = {
   other:      { emoji:'📦', label:'Other',      loc:'cabinet', items:[] }
 };
 
+const allSuggestions=Object.entries(CATS).flatMap(([category,cat])=>(cat.items||[]).map(name=>({name,category})));
+document.getElementById('grocery-suggestions').innerHTML=allSuggestions.map(i=>`<option value="${i.name}"></option>`).join('');
+
 const LOCATIONS = {
   fridge:    { emoji:'🧊', label:'Fridge' },
   freezer:   { emoji:'❄️', label:'Freezer' },
@@ -192,6 +209,18 @@ const LOCATIONS = {
 
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showToast(msg,dur=2000){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),dur); }
+function inferCategory(name){ return allSuggestions.find(i=>i.name.toLowerCase()===name.toLowerCase())?.category||'other'; }
+function recentKey(){ return 'hm_recent_groceries_'+FC; }
+function rememberGrocery(name){
+  let recent=[]; try{recent=JSON.parse(localStorage.getItem(recentKey())||'[]');}catch(e){}
+  recent=[name,...recent.filter(x=>x.toLowerCase()!==name.toLowerCase())].slice(0,8);
+  localStorage.setItem(recentKey(),JSON.stringify(recent)); renderRecentGroceries();
+}
+function renderRecentGroceries(){
+  let recent=[]; try{recent=JSON.parse(localStorage.getItem(recentKey())||'[]');}catch(e){}
+  const el=document.getElementById('recent-groceries'); el.innerHTML='';
+  recent.slice(0,5).forEach(name=>{ const b=document.createElement('button'); b.className='recent-chip'; b.textContent='+ '+name; b.onclick=()=>quickAddGrocery(name); el.appendChild(b); });
+}
 
 let shoppingList = [];
 let currentCat = null;
@@ -244,6 +273,18 @@ function renderCatGrid(){
   });
 }
 renderCatGrid();
+renderRecentGroceries();
+
+window.quickAddGrocery=async function(prefill){
+  const inp=document.getElementById('quick-grocery-input'); const name=(prefill||inp.value).trim(); if(!name)return;
+  const existing=shoppingList.find(i=>i.name.toLowerCase()===name.toLowerCase()&&!i.checked);
+  if(existing){ showToast('Already on your list'); inp.value=''; return; }
+  const category=inferCategory(name),cat=CATS[category]||{loc:'pantry'};
+  await addDoc(collection(db,'families',FC,'shoppingList'),{name,category,qty:1,checked:false,addedAt:serverTimestamp(),source:'quick',location:cat.loc||'pantry'});
+  inp.value=''; rememberGrocery(name); showToast(name+' added'); window.hmStatus?.('Saved');
+};
+
+if(new URLSearchParams(location.search).get('action')==='add') setTimeout(()=>document.getElementById('quick-grocery-input').focus(),0);
 
 function openPanel(catKey){
   currentCat = catKey;

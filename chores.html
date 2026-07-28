@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#0f0f0f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Chores — Upton ∞ +1</title>
+  <link rel="stylesheet" href="shared.css" />
+  <script src="shared.js" defer></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -143,6 +145,10 @@
 
 <main>
   <div class="page active" id="page-today">
+    <div class="recur-options" style="margin-bottom:14px">
+      <div class="recur-opt selected" id="filter-mine" onclick="setChoreFilter('mine')">My chores</div>
+      <div class="recur-opt" id="filter-all" onclick="setChoreFilter('all')">Everyone</div>
+    </div>
     <div id="today-content"><div class="loader">Loading…</div></div>
   </div>
 
@@ -167,7 +173,7 @@
 
     <div class="section-header">
       <h2>Chores</h2>
-      <button class="btn btn-primary btn-sm" onclick="openChoreModal()">+ Add Chore</button>
+      <div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" id="legacy-import-btn" style="display:none" onclick="importLegacyChores()">Import old chores</button><button class="btn btn-primary btn-sm" onclick="openChoreModal()">+ Add Chore</button></div>
     </div>
     <div id="chores-manage-list"><div class="loader">Loading…</div></div>
   </div>
@@ -242,13 +248,17 @@ let chores = [];
 let completions = {}; // { 'choreId_date': true }
 let weekOffset = 0;
 let currentTab = 'today';
+let choreFilter = 'mine';
+const CURRENT_USER=(()=>{try{return JSON.parse(localStorage.getItem('hm_session')).user||'';}catch(e){return '';}})();
+
+window.setChoreFilter=function(filter){ choreFilter=filter; document.getElementById('filter-mine').classList.toggle('selected',filter==='mine'); document.getElementById('filter-all').classList.toggle('selected',filter==='all'); renderToday(); };
 
 // ── SEED DEFAULT PEOPLE ───────────────────────────────────────────────────────
 async function seedPeople() {
-  const snap = await getDocs(collection(db, 'chorePeople'));
+  const snap = await getDocs(collection(db, 'families', FC, 'members'));
   if (snap.empty) {
     for (let i = 0; i < DEFAULT_PEOPLE.length; i++) {
-      await addDoc(collection(db, 'chorePeople'), {
+      await addDoc(collection(db, 'families', FC, 'members'), {
         name: DEFAULT_PEOPLE[i],
         color: AVATAR_COLORS[i % AVATAR_COLORS.length],
         order: i,
@@ -260,15 +270,31 @@ async function seedPeople() {
 seedPeople();
 
 // ── REAL-TIME LISTENERS ───────────────────────────────────────────────────────
-onSnapshot(query(collection(db, 'chorePeople'), orderBy('order')), snap => {
+onSnapshot(query(collection(db, 'families', FC, 'members'), orderBy('order')), snap => {
   people = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderAll();
 });
 
-onSnapshot(query(collection(db, 'choreDefinitions'), orderBy('createdAt')), snap => {
+onSnapshot(query(collection(db, 'families', FC, 'choreDefinitions'), orderBy('createdAt')), snap => {
   chores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if(snap.empty) checkLegacyChores(); else document.getElementById('legacy-import-btn').style.display='none';
   renderAll();
 });
+
+async function checkLegacyChores(){
+  try{ const legacy=await getDocs(collection(db,'choreDefinitions')); document.getElementById('legacy-import-btn').style.display=legacy.empty?'none':'inline-flex'; }
+  catch(e){ document.getElementById('legacy-import-btn').style.display='none'; }
+}
+
+window.importLegacyChores=async function(){
+  if(!confirm('Copy the original chores and completion history into this family?'))return;
+  const [legacyChores,legacyPeople,legacyDone]=await Promise.all([getDocs(collection(db,'choreDefinitions')),getDocs(collection(db,'chorePeople')),getDocs(collection(db,'choreCompletions'))]);
+  for(const item of legacyChores.docs) await setDoc(doc(db,'families',FC,'choreDefinitions',item.id),item.data());
+  const names=new Set(people.map(p=>p.name.toLowerCase()));
+  for(const item of legacyPeople.docs){ const data=item.data(); if(data.name&&!names.has(data.name.toLowerCase())) await addDoc(collection(db,'families',FC,'members'),data); }
+  for(const item of legacyDone.docs) await setDoc(doc(db,'families',FC,'choreCompletions',item.id),item.data());
+  document.getElementById('legacy-import-btn').style.display='none'; showToast('Old chores imported');
+};
 
 // Load completions for ±2 weeks window
 function loadCompletions() {
@@ -282,7 +308,7 @@ function loadCompletions() {
   const end = dateToStr(sat);
 
   onSnapshot(
-    query(collection(db, 'choreCompletions'), where('date','>=',start), where('date','<=',end)),
+    query(collection(db, 'families', FC, 'choreCompletions'), where('date','>=',start), where('date','<=',end)),
     snap => {
       completions = {};
       snap.docs.forEach(d => { completions[d.id] = true; });
@@ -326,7 +352,7 @@ function isComplete(choreId, dateStr) {
 // ── TOGGLE COMPLETE ───────────────────────────────────────────────────────────
 window.toggleComplete = async function(choreId, dateStr) {
   const key = choreId+'_'+dateStr;
-  const ref = doc(db, 'choreCompletions', key);
+  const ref = doc(db, 'families', FC, 'choreCompletions', key);
   if (completions[key]) {
     await deleteDoc(ref);
   } else {
@@ -351,7 +377,8 @@ function renderToday() {
   }
 
   // Group by person
-  people.forEach(person => {
+  const visiblePeople=choreFilter==='mine'?people.filter(p=>p.name.toLowerCase()===CURRENT_USER.toLowerCase()):people;
+  visiblePeople.forEach(person => {
     const mine = dueChores.filter(c => (c.assignees||[]).includes(person.name));
     if (mine.length === 0) return;
     const allDone = mine.every(c => isComplete(c.id, today));
@@ -380,8 +407,12 @@ function renderToday() {
     el.appendChild(section);
   });
 
+  if(choreFilter==='mine'&&visiblePeople.length===0){
+    el.innerHTML += `<div class="no-chores-today">No chores are assigned to ${esc(CURRENT_USER||'you')} today.<br>Switch to <strong>Everyone</strong> to see the household.</div>`;
+  }
+
   // Chores with no assignee or assignees not in people list
-  const unassigned = dueChores.filter(c => !(c.assignees||[]).some(a => people.find(p => p.name===a)));
+  const unassigned = choreFilter==='all'?dueChores.filter(c => !(c.assignees||[]).some(a => people.find(p => p.name===a))):[];
   if (unassigned.length > 0) {
     const section = document.createElement('div');
     section.style.marginBottom = '16px';
@@ -525,6 +556,7 @@ function renderManage() {
             <span class="recur-badge">${esc(recurLabel)}</span>
           </div>
         </div>
+        <button class="del-btn" onclick="editChore('${chore.id}')">Edit</button>
         <button class="del-btn" onclick="deleteChore('${chore.id}')">✕</button>`;
       card.appendChild(row);
     });
@@ -540,12 +572,12 @@ window.addPerson = async function() {
   if (people.find(p => p.name.toLowerCase() === name.toLowerCase())) { showToast('Person already exists'); return; }
   inp.value = '';
   const color = AVATAR_COLORS[people.length % AVATAR_COLORS.length];
-  await addDoc(collection(db, 'chorePeople'), { name, color, order: people.length, createdAt: serverTimestamp() });
+  await addDoc(collection(db, 'families', FC, 'members'), { name, color, order: people.length, createdAt: serverTimestamp() });
 };
 
 window.deletePerson = async function(id, name) {
   if (!confirm(`Remove ${name} from the list?`)) return;
-  await deleteDoc(doc(db, 'chorePeople', id));
+  await deleteDoc(doc(db, 'families', FC, 'members', id));
   showToast(`${name} removed`);
 };
 
@@ -553,8 +585,10 @@ window.deletePerson = async function(id, name) {
 let selectedAssignees = new Set();
 let selectedRecur = 'daily';
 let selectedDays = new Set();
+let editingChoreId = null;
 
 window.openChoreModal = function() {
+  editingChoreId = null;
   selectedAssignees = new Set();
   selectedRecur = 'daily';
   selectedDays = new Set();
@@ -563,6 +597,14 @@ window.openChoreModal = function() {
   setRecur('daily');
   buildAssigneeChips();
   buildDayChips();
+  document.getElementById('chore-modal').classList.add('open');
+};
+
+window.editChore = function(id) {
+  const chore=chores.find(c=>c.id===id); if(!chore)return; editingChoreId=id;
+  selectedAssignees=new Set(chore.assignees||[]); selectedRecur=chore.recurrence||'daily'; selectedDays=new Set(chore.days||[]);
+  document.getElementById('chore-name-input').value=chore.name||''; document.getElementById('chore-modal-title').textContent='Edit Chore';
+  document.getElementById('once-date-input').value=chore.date||todayStr(); setRecur(selectedRecur); buildAssigneeChips(); buildDayChips();
   document.getElementById('chore-modal').classList.add('open');
 };
 
@@ -623,22 +665,25 @@ window.saveChore = async function() {
     assignees: [...selectedAssignees],
     recurrence: selectedRecur,
     active: true,
-    createdAt: serverTimestamp()
+    updatedAt: serverTimestamp()
   };
   if (selectedRecur === 'weekly') data.days = [...selectedDays].sort();
   if (selectedRecur === 'once') data.date = document.getElementById('once-date-input').value;
 
-  await addDoc(collection(db, 'choreDefinitions'), data);
+  if(editingChoreId) await updateDoc(doc(db,'families',FC,'choreDefinitions',editingChoreId),data);
+  else await addDoc(collection(db, 'families', FC, 'choreDefinitions'), {...data,createdAt:serverTimestamp()});
   closeChoreModal();
-  showToast('Chore added!');
+  showToast(editingChoreId?'Chore updated!':'Chore added!');
   switchTab('manage');
 };
 
 window.deleteChore = async function(id) {
   if (!confirm('Delete this chore?')) return;
-  await deleteDoc(doc(db, 'choreDefinitions', id));
+  await deleteDoc(doc(db, 'families', FC, 'choreDefinitions', id));
   showToast('Chore deleted');
 };
+
+if(new URLSearchParams(location.search).get('action')==='add') setTimeout(()=>openChoreModal(),0);
 
 </script>
 </body>
